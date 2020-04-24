@@ -1,0 +1,271 @@
+<html ng-app="app" ng-controller="MainCtrl"><body>
+<script src="/angular-1.6.4/angular.min.js"></script>
+<script defered>
+(window.xa=app=(angular||{}).module('app', [] ))
+
+app.controller('MainCtrl',['$scope',
+function mainCtrlController($scope,$rootScope ) {
+	var p=app.p=$scope ;p.app=app;
+
+	p.newId=function(){return (new Date()).getTime();}
+
+	var x=localStorage.coop1Data
+	if(!x)
+	{p.appData={
+		coops:[{id:p.newId(),label:'dasma',branchs:[{id:p.newId(),label:'dasma'}]}
+			,{id:p.newId(),label:'daayia',branchs:[{id:p.newId(),label:'daayia'}]}
+			,{id:p.newId(),label:'sulaibikhat',branchs:[{id:p.newId(),label:'sulaibikhat'}]}
+		]
+		,govs:[{id:0,label:'Capital',depts:[],areas:{1:{id:1,label:'sharq'},2:{id:2,blocks:[],label:'dasma'}}}
+			,{id:1,label:'Hawalli',depts:[],areas:{3:{id:3,blocks:[],label:'hawalli'},4:{id:4,blocks:[],label:'salmiya'}}}
+			,{id:2,label:'Ahmadi',depts:[],areas:{5:{id:5,blocks:[],label:'ahmdi'},6:{id:6,blocks:[],label:'fahahil'}}}
+			,{id:3,label:'Jahra',depts:[],areas:{7:{id:7,blocks:[],label:'jahra'},8:{id:8,blocks:[],label:'naseem'}}}
+			,{id:4,label:'Farwaniya',depts:[],areas:{9:{id:9,blocks:[],label:'farwaniya'},10:{id:10,blocks:[],label:'dhajij'}}}
+			,{id:5,label:'Mobarak',depts:[],areas:{11:{id:11,blocks:[],label:'mobarak'},12:{id:12,blocks:[],label:'adan'}}}
+			]
+		};
+		x=JSON.stringify(p.appData)
+		localStorage.coop1Data =x
+	}else
+		p.appData=JSON.parse(x)
+	p.timeslotPeriod=30; // in minutes
+	p.workingHours=[new Date(0,0,0,7,30),new Date(0,0,0,14,30)]
+	x=localStorage.coop1DataUsrSession
+	if(x)
+		p.session=JSON.parse(x);
+	else{
+		p.session={cid:0,date:p.newId()}
+		localStorage.coop1DataUsrSession=JSON.stringify(p.session);}
+
+	x=localStorage.coop1DataCoopBranch
+	if(x)
+		p.coop=JSON.parse(x);
+	else{
+		p.coop={cid:0,id:p.newId(),name:0
+			,govId:0,areaId:0,coopId:0
+			,t:[]
+		}
+		localStorage.coop1DataCoopBranch=JSON.stringify(p.coop)
+	}
+
+	x=p.session?p.session.cid:0;
+
+	p.usr=x?p.appData.usrs[x]:0;
+
+	p.setScreen=function(x,s){
+		console.log('p.setScreen:',x,s)
+		p['screen'+(s?s:'')]=x;
+		if(x=='logout')
+			localStorage.coop1DataUsrSession=p.usr=p.session=null // TODO: save localStorage.coop1Data ,  save localStorage.coop1DataUsrSession
+	}
+
+	p.chngSlct=function(entity,v,path){
+		var old=p[entity],x
+		console.log('p.chngSlct:',entity,v,old,path)
+		function f(e,v){
+			p.slct[e]=v;
+			v=p.slctMask[e]
+			v.forEach(e=>f(e,null))
+		}
+		f(entity,v);
+	}
+
+	p.apntmntNew=function(t){
+		var x={id:p.newId(),t:t,cid:p.usr.cid}
+		return x;
+	}
+
+	p.generateDayAppointments=function(t){
+		var d=new Date(t.getFullYear(),t.getMonth(),t.getDate()
+			,p.workingHours[0].getHours()
+			,p.workingHours[0].getMinutes())
+		,	x=new Date(t.getFullYear(),t.getMonth(),t.getDate()
+			,p.workingHours[1].getHours()
+			,p.workingHours[1].getMinutes())
+		,  tp=1000*60*p.timeslotPeriod
+		,a=[{t:d}];
+		d=new Date(d.getTime()+tp)
+		while(d.getTime()<=x){
+			a.push({t:d})
+			d=new Date(d.getTime()+tp)
+		}
+		return a;
+	}
+
+	//p.dateToArray=function(x){x=[x.getFullYear(),x.getMonth()+1,x.getDay(),x.getHours(),x.getMinutes(),x.getSeconds(),x.getMilliseconds(),x];return x;};p.d2Arr=function(x){x=[x.getHours(),x.getMinutes(),x];return x;}
+	p.radioTime=function(apt){
+		var u=p.usr,s='appointment',x=u[s]
+		if(x)x.cid=null;
+		u[s]=apt;apt.cid=u.cid;
+		console.log('radioTime:',apt)
+		}
+
+	p.tm2s=function tm2s(t){return t.getHours()+':'+('00'+t.getMinutes()).slice(-2);}
+
+	p.day=new Date();
+	p.appointmentsTable=p.generateDayAppointments( p.day )//p.usrData={};
+
+	if(p.usr)p.usrLogin.init()
+
+	console.log('controller:MainCntrl: app=',app,' ,scope=',p )
+}
+]
+)
+/*
+TODO:
+Server:
+	Store appData on the server
+
+//////////////////////////////////
+Client:
+////////
+on init controller
+check localStorage and sync with server the following props:
+	appData(govs,coops)
+	coop data
+	usr data
+		state
+
+User State:
+	Non
+	,SignupPending
+	,ProfilePending
+	,Ready  //  ,Loggedout
+	,QueuePending
+	,Queued
+	,Auth2enter
+	,InCoop
+	,QuotaPending
+
+admin
+	list signup req
+	list apntmnt req
+	list queue
+	scan coop-entry
+	scan coop-exit
+	list in-coop
+	list online users
+	list log-history
+		filter
+	search/list users by:
+		coop
+		user.state
+		area/block
+		cid
+		coop-membership-no
+		tel-no
+		email
+		name
+		apntmnt-history
+		age/dob
+		gender / nationality
+
+
+*/
+</script>
+<h1>Coop Appointments</h1>
+
+<table>
+    <tr ng-repeat="t in appointmentsTable"
+        ng-style="t.cid==usr.cid?{bgcolor:'green'}:t.cid?{bgcolor:'gray'}:{}">
+        <td><input ng-if="!t.cid || t.cid==usr.cid"
+                   type="radio"
+                   name="t"
+                   value="{{t.t.getTime()}}"
+                   ng-click="radioTime(t)"
+        /></td><td>{{tm2s(t.t)}}</tr>
+</table>
+
+<br/>mbohamad@kisr.edu.kw
+</body>
+</html>
+
+
+<!--
+login
+date
+table of appointments
+
+{"op":"login"
+,"pw":"m"
+,"lastModified":1230
+,"clientTime":12340
+,"return"
+{2020:
+	{4:
+		{17:
+			{4:
+				{45:
+					{14:
+						{0:
+							{"usr":
+								{"root":
+									{"blockId":""
+										,"branchId":"1"
+										,"areaId":""
+										,"govId":""
+										,"name":"moh"
+										,"coopId":"1"
+										,"tel":"99876454"
+										,"email":"mohamadjb@gmail.com"
+										,"cid":"root"
+									}
+								}
+							}
+						}
+					}
+				}
+			,21:{27:
+					{9:
+						{0:
+							{"coop":
+								{"1":
+									{"val":
+										"{\"blockId\":\"\",\"areaId\":\"\",\"branchs\":[],\"govId\":\"\",\"tel\":\"99876454\",\"label\":\"main-coop\",\"email\":\"mohamadjb@gmail.com\",\"cid\":\"1\"}"
+										,"signupReq":["m"]
+										,"log":1587148029000
+										,"meta":{"str":"Null","hashCode":"587d1d39","class":"moh.coop.M$Json$Prsr$Literal"}
+										,"cat":"coop"
+										,"id":"1"
+										,"class":"Coop"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			,19:{16:
+					{14:
+						{28:
+							{0:
+								{"usr":
+									{"m":
+										{"branchId":"1"
+											,"session":12340
+											,"coopId":"1"
+											,"login":1587707190280
+											,"blockId":""
+											,"logout":1587707109477
+											,"areaId":""
+											,"govId":""
+											,"name":"moh"
+											,"tel":"99876454"
+											,"state":"SignupPending"
+											,"email":"mohamadjb@gmail.com"
+											,"cid":"m"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	,"cid":"m"
+}
+
+
+-->
