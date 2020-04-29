@@ -78,23 +78,30 @@ public static void registerMethods(Class p) {
 			Class[] prmTypes = op.getParameterTypes();
 			Class cl = op.getDeclaringClass();
 			Annotation[][] prmsAnno = op.getParameterAnnotations();
-			int n = prmsAnno == null ? 0 : prmsAnno.length, i = - 1;tl.h.urli=-1;
+			int n = prmsAnno == null ? 0 : prmsAnno.length, i = - 1;tl.h.urli=-2;
 			Object[] args = new Object[n];
 
 			for(Annotation[] t : prmsAnno) try {
 				HttpMethod pp = t.length > 0 && t[0] instanceof HttpMethod ? (HttpMethod) t[0] : null;
 				Class prmClss = prmTypes[++ i];
 				String nm = pp != null ? pp.prmName() : "arg" + i;//t.getName();
-				Object o = null;
+				Object o ;
 				if(pp != null && pp.prmUrlPart()) {
-					args[i]=tl.h.url[tl.h.urli++];
+					if(String.class.isAssignableFrom(prmClss))args[i]=tl.h.url[tl.h.urli++];
+					else args[i]=Util.parse(tl.h.url[tl.h.urli++],prmClss);
 				} else if(pp != null && pp.prmUrlRemaining()) {
 					if(tl.h.url!=null&&tl.h.urli<tl.h.url.length) {
-						StringBuilder b = new StringBuilder(tl.h.url[tl.h.urli++]);
-						while(tl.h.urli<tl.h.url.length){b.append('/' ).append(tl.h.url[tl.h.urli++]);
-						}
-						args[i] = b.toString();//url.indexOf(urlIndx + 1);
-					}
+						if(List.class.isAssignableFrom(prmClss)){
+							List l=Util.lst();
+							while(tl.h.urli<tl.h.url.length)
+								l.add(tl.h.url[tl.h.urli++]);
+							args[i]=l;
+						}else{
+							StringBuilder b = new StringBuilder(tl.h.url[tl.h.urli++]);
+							while(tl.h.urli<tl.h.url.length)
+								b.append('/' ).append(tl.h.url[tl.h.urli++]);
+							args[i] = b.toString();//url.indexOf(urlIndx + 1);
+					}}
 				} else if(pp != null && pp.prmLoadByUrl()) {
 					Class[] ca = {TL.class , String.class};
 					Method//m=cl.getMethod( "prmLoadByUrl", ca );if(m==null)
@@ -114,21 +121,21 @@ public static void registerMethods(Class p) {
 				}
 				else if(pp != null && pp.prmBody())
 					args[i] = prmClss.isAssignableFrom(String.class)
-						          ? Util.readString(tl.h.req.getReader())
-						          : tl.bodyData;
+			          ? Util.readString(tl.h.req.getReader())
+			          : tl.bodyData;
 				else
-					args[i] = o = TL.class.equals(prmClss) ? tl
-						              : tl.h.req(nm, prmClss);
+					args[i] = TL.class.equals(prmClss) ? tl
+						: tl.h.req(nm, prmClss);
 			} catch(Exception ex) {
 				tl.error(ex, SrvltName, ".service:arg:i=", i);
 			}
 			retVal = n == 0 ? op.invoke(cl)
-				         : n == 1 ? op.invoke(cl, args[0])
-					           : n == 2 ? op.invoke(cl, args[0], args[1])
-						             : n == 3 ? op.invoke(cl, args[0], args[1], args[2])
-							               : n == 4 ? op.invoke(cl, args[0], args[1], args[2], args[3])
-								                 : n == 5 ? op.invoke(cl, args[0], args[1], args[2], args[3], args[4])
-									                   : op.invoke(cl, args);
+				: n == 1 ? op.invoke(cl, args[0])
+				: n == 2 ? op.invoke(cl, args[0], args[1])
+				: n == 3 ? op.invoke(cl, args[0], args[1], args[2])
+				: n == 4 ? op.invoke(cl, args[0], args[1], args[2], args[3])
+				: n == 5 ? op.invoke(cl, args[0], args[1], args[2], args[3], args[4])
+				: op.invoke(cl, args);
 			if(httpMethodAnno != null && httpMethodAnno.nestJsonReq() && tl.json != null) {
 				tl.json.put("return", retVal);
 				retVal = tl.json;
@@ -495,9 +502,9 @@ public static class TL{
 
 	public void logA(Object[]s){try{
 		jo().clrSW();
-		for(Object t:s)jo.w(String.valueOf(t));
+		for(Object t:s)if(t instanceof String)jo.w(String.valueOf(t));else jo.o(t);
 		String t=jo.toStrin_();
-		h.getServletContext().log(t);
+		h.getServletContext().log(t);System.out.println(t);
 		if(h.logOut)out.flush().w(h.comments[0]).w(t).w(h.comments[1]);
 	}catch(Exception ex){
 		ex.printStackTrace();
@@ -932,6 +939,7 @@ public static class Json {
 			else if (a instanceof HttpSession) oSession((HttpSession) a, ind, path);
 			else if (a instanceof Cookie) oCookie((Cookie) a, ind, path);
 			else if (a instanceof java.util.UUID) w("\"").p(a.toString()).w(c ? "\"/*uuid*/" : "\"");
+			else if (a instanceof Prsr.Literal) w(a.toString().toLowerCase());
 			else {
 				w("{\"class\":").oStr(a.getClass().getName(), ind)
 					.w(",\"str\":").oStr(String.valueOf(a), ind)
@@ -1969,7 +1977,7 @@ public static class Sql {
 	public static PreparedStatement P(String sql,Object[]p,boolean odd)throws SQLException {
 		TL t=TL.tl();Connection c=c(t);//t.dbc();
 		PreparedStatement r=c.prepareStatement(sql);if(t.h.logOut)
-			t.log(SrvltName,"("+t+").Sql.P(sql="+sql+",p="+p+",odd="+odd+")");
+			t.log(SrvltName,"(",t,").Sql.P(sql=",sql,",odd=",odd,",p=",p,")");
 		if(odd){if(p.length==1)
 			r.setObject(1,p[0]);else
 			for(int i=1,n=p.length;p!=null&&i<n;i+=2)if((!(p[i] instanceof List))

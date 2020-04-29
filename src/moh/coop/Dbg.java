@@ -30,14 +30,15 @@ public static void main(String[]args)throws Exception{
 			where typ is optional depending on method
 		, 3rdString is body ,and most methods
 			take the body as JsonStorage.val*/
-		{"POST","/2020/coop/index.jsp", "{op:'signup',cid:'m',pw:'m',val:{name:'moh',cid:'m',tel:'99876454',email:'mohamadjb@gmail.com',coopId:'1',govId:'',areaId:'',blockId:'',branchId:'1'}}"} // signup
-		,{"POST","/2020/coop/index.jsp", "{op:logout}"} // logout
-		,{"POST","/2020/coop/index.jsp", "{op:'login',cid:'m',pw:'m',lastModified:1230,clientTime:12340}"} // login
-		,{"POST","/2020/coop/index.jsp", "{op:'chngPw',clientTime:2345,pw:'m'}"} // chngPw
-		,{"POST","/2020/coop/index.jsp",
-		"{op:update,cat:coop,id:1,val:{x:''},path:['test#',0]}"} // update
-		,{"POST","/2020/coop/index.jsp", "{op:'byDates',from:'123456'}"} // byDates
-		,{"POST","/2020/coop/index.jsp", "{op:'logout'}"} // logout
+		{"signup","/CoopSrvlt/", "{cid:'m',pw:'m',val:{name:'moh',cid:'m',tel:'99876454',email:'mohamadjb@gmail.com',coopId:'1',govId:'',areaId:'',blockId:'',branchId:'1'}}"} // signup
+		,{"logout","/CoopSrvlt/", ""} // logout
+		,{"login","/CoopSrvlt/m/1230/12340", "{pw:'m'}"} // login
+		,{"chngPw","/CoopSrvlt/", "{pw:'m'}"} // chngPw
+		,{"put","/CoopSrvlt/coop/1/test#/0","{x:''}"} // update
+		,{"patch","/CoopSrvlt/coop/1/test#/0","{x:''}"} // updateMeta
+		,{"post","/CoopSrvlt/x/1","{x:''}"} // insert
+		,{"get","/CoopSrvlt/123456/1234567000", ""} // byDates
+		,{"logout","/CoopSrvlt/", ""} // logout
 	};
 
 	for(String[]p:prms){

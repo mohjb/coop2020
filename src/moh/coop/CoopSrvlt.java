@@ -21,7 +21,7 @@ signup(@HttpMethod(prmName="cid") String cid
 	Object o=val==null?null:val.get("coopId");
 	Coop c=val==null||o==null?null:Coop.load(o.toString());
 	if(u == null && c!=null ) {
-		String md5 = Util.md5 (pw);
+		String md5 = Util.md5 (Util.b64d(pw));
 		tl.h.s("usr",tl.usr=u=new User());
 		tl.h.s("cid",u.id=cid);u.cat="usr";
 		List l=(List)c.vo("signupReq");
@@ -39,28 +39,30 @@ signup(@HttpMethod(prmName="cid") String cid
 	}return m;}
 
 @HttpMethod(usrLoginNeeded = false) public static Map
-login(@HttpMethod(prmName="cid") String cid
+login(@HttpMethod(prmUrlPart = true) String cid//prmName="cid"
+	,@HttpMethod (prmUrlPart = true)Date lm//prmName ="lm"
+	,@HttpMethod (prmUrlPart = true)Date ct //prmName="clientTime"
 	, @HttpMethod(prmName="pw") String pw
-	,@HttpMethod(prmName ="lastModified")Date lm
-	,@HttpMethod(prmName="clientTime")Date ct
 	, TL tl)throws Exception {
+	tl.log("CoopSrvlt.login:0:",cid,pw,lm,ct);
 	User u=User.load (cid);
-	String md5=pw != null?Util.md5(pw):pw,upw=u.pw();
+	String md5=pw != null?Util.md5(Util.b64d(pw)):pw,upw=u.pw();
 	if(u != null && upw!=null && upw.equals(md5)) {
 		tl.h.s("cid",cid);
 		tl.h.s("usr",tl.usr=u);
 		u.v("login",tl.now);
 		u.v("session",ct,2); //m.put("return",tl.now);
-		return Util.mapCreate("val",u.v(),"byDates",byDates(lm,null,tl));
-	}return null;}
+		tl.log("CoopSrvlt.login:1:ok:");
+		return Util.mapCreate("val",u.v(),"byDates",Prop.byDates(lm,null,tl));
+	}tl.log("CoopSrvlt.login:2:return null;");return null;}
 
-@HttpMethod public static Map chngPw(
-	@HttpMethod(prmName = "pw") String pw
+@HttpMethod public static Map
+chngPw(@HttpMethod(prmName = "pw") String pw
 	,@HttpMethod(prmName = "clientTime")Date clientTime
 	, TL tl)throws Exception {
 	//Map m= Util.mapCreate("time",tl.now);//String md5=Util.md5(pw);
 	if(tl.usr != null ) { // && tl.usr.pw!=null && tl.usr.pw.equals(md5)
-		tl.usr.chngPw(pw);
+		tl.usr.chngPw(Util.b64d(pw));
 		return Util.mapCreate("time",tl.now);
 	}return null;}
 
@@ -68,11 +70,11 @@ login(@HttpMethod(prmName="cid") String cid
 	tl.usr.v("logout",tl.now,2);
 	tl.h.s("cid",tl.h.s("usr",tl.usr =null));}
 
-@HttpMethod public static Map update(
-	@HttpMethod(prmName = "cat")String cat
-	,@HttpMethod(prmName = "id")String id
-	,@HttpMethod(prmName="path")List path
-	,@HttpMethod(prmName="val" )Object p
+@HttpMethod public static Map //update
+put(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
+    ,@HttpMethod(prmUrlPart = true)String id // prmName="id"
+    ,@HttpMethod(prmUrlRemaining = true)List path // prmName = "path"
+    ,@HttpMethod(prmBody = true)Object p // prmName = val
 	,TL tl)throws Exception {
 	Map m=Util.mapCreate();
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
@@ -121,11 +123,11 @@ login(@HttpMethod(prmName="cid") String cid
  */
 }
 
-@HttpMethod public static Map
-updateMeta(@HttpMethod(prmName = "cat")String cat
-	,@HttpMethod(prmName = "id")String id
-	,@HttpMethod(prmName = "path")List path
-	,@HttpMethod(prmName = "meta")Object p
+@HttpMethod public static Map // updateMeta
+patch(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
+	     ,@HttpMethod(prmUrlPart = true)String id // prmName="id"
+	,@HttpMethod(prmUrlRemaining = true)List path // prmName = "path"
+	,@HttpMethod(prmBody = true)Object p // prmName = "meta"
 	,TL tl)throws Exception {
 	Map m=Util.mapCreate();
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
@@ -142,10 +144,10 @@ updateMeta(@HttpMethod(prmName = "cat")String cat
 		m.put("return", tl.now);
 	}return m;}
 
-@HttpMethod public static Map
-insert(@HttpMethod(prmName="cat")String cat
-	,@HttpMethod(prmName="id")String id
-	,@HttpMethod(prmName="val")Object p
+@HttpMethod public static Map // insert
+post(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
+	,@HttpMethod(prmUrlPart = true)String id // prmName="id"
+	,@HttpMethod(prmBody = true)Object p // prmName="val"
 	,TL tl)throws Exception {
 	Map m=Util.mapCreate();
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
@@ -163,11 +165,10 @@ insert(@HttpMethod(prmName="cat")String cat
 		m.put("return", tl.now);//}
 	return m;}
 
-@HttpMethod public static Map
-byDates(@HttpMethod(prmName="from")Date d1
-	,@HttpMethod(prmName="to")Date d2
-	,TL tl)throws Exception{
-	return Prop.byDates( d1,d2,tl );}
+@HttpMethod public static Map//byDates
+get(@HttpMethod(prmUrlPart = true)Date d1//prmName="from"
+	   ,@HttpMethod(prmUrlPart = true)Date d2//prmName="to"
+	   ,TL tl)throws Exception{	return Prop.byDates( d1,d2,tl );}
 
 //////////////////////////////////////////////////////////////////////
 

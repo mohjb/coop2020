@@ -53,7 +53,7 @@ function mainCtrlController($scope,$rootScope ) {
 		for(var cat in d[7]){d[8]=d[7][cat]
 		for(var id in d[8]){o=d[8][id]
 			x=new Date(y,mnth,dy,hr,mn,sc,ms).getTime() // 
-			if(p.usrls.srvrLM<x)p.usrls.srvrLM=x
+			if(p.usrls.srvrLM<x){p.usrls.srvrLM=x;}
 			p.saveLSProp(cat,id,o)
 			p.onSrvrChng(cat,id,o)
 	}}}}}}}}}}
@@ -92,31 +92,38 @@ function mainCtrlController($scope,$rootScope ) {
 		var k='coop1|'+cat+'|'+id
 		,s=JSON.stringify(prop);
 		localStorage[k]=s;
+		console.log('saveLSProp:',k,s);
 		return s;}
 	p.saveLSUsr=function(){
 		localStorage.coop1Usr=JSON.stringify(p.usrls);}
 
 p.srvr={
-url:'http://localhost:8080/coop/index.jsp'
-,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'post',data:{op:'signup',cid:cid,pw:pw,val:val}})
-,login	:(cid,pw,lastModified,clientTime)=>fetch(p.srvr.url,{method:'post',data:{op:'login',cid:cid,pw:pw,lastModified:lastModified,clientTime:clientTime}})
-,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'post',data:{op:'chngPw',pw:pw,clientTime:clientTime}})
-,update	:(cat,id,path,val)=>fetch(p.srvr.url,{method:'post',data:{op:'update',cat:cat,id:id,path:path,val:val}})
-,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url,{method:'post',data:{op:'updateMeta',cat:cat,id:id,path:path,meta:meta}})
-,insert	:(cat,id,val)	=>fetch(p.srvr.url,{method:'post',data:{op:'insert',cat:cat,id:id,val:val}})
-,byDates	:(from,to)		=>fetch(p.srvr.url,{method:'post',data:{op:'byDates',from:from,to:to}})
-
+url:'http://localhost:8080/CoopSrvlt/'
+,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'signup',body:JSON.stringify({cid:cid,pw:btoa(pw),val:val})})
+,login	:(cid,pw,lm,clientTime)=>{
+	var s=p.srvr.url+cid+'/'+lm+'/'+clientTime;
+	console.log('srvr.login:',lm,s);
+	return fetch(s,{method:'login',body:
+		JSON.stringify({pw:btoa(pw)})})}
+,logout	:()=>{var s=p.srvr.url;console.log('srvr.logout:',s);return fetch(s,{method:'logout'})}
+,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'chngPw',body:JSON.stringify({pw:btoa(pw),clientTime:clientTime})})
+,update	:(cat,id,path,lm,val)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'put',body:JSON.stringify(val)})
+,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'patch',body:JSON.stringify(meta)})
+,insert	:(cat,id,val)	=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'post',body:JSON.stringify(val)})
+,byDates	:(from,to)		=>fetch(p.srvr.url+from+'/'+to)
 }//srvr
 
 	p.usrLogin=()=>{
 		var n=p.inp,dt=now();
-		p.srvr.login(n.cid,n.pw,n.lm,now())
+		console.log('usrLogin',n,dt);
+		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt)
 		.then(r=>r.json())
 		.then(r=>{
 			if(r)
 			{	p.usrls.val=p.usr=r.val;
 				p.onByDate(r.byDates)
 				p.screen='consumer'
+				console.log('usrLogin:response',r);
 				return p.saveLSUsr()}
 			else
 				alert('invalid login');
@@ -148,11 +155,11 @@ url:'http://localhost:8080/coop/index.jsp'
 xhr
 
 <fieldset><legend>login</legend>
-<form id=frmLogin><table border=1>
-<tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
-<tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
-</table><input type="button" ng-click="usrLogin()" value="Login" /></form>
-<div id=loginInfo></div>
+    <form id=frmLogin><table border=1>
+        <tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
+        <tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
+    </table><input type="button" ng-click="usrLogin()" value="Login" /></form>
+    <div id=loginInfo></div>
 </fieldset>
 
 <fieldset><legend>logout</legend>
@@ -179,10 +186,3 @@ xhr
 <br/>mbohamad@kisr.edu.kw
 </body>
 </html>
-
-
-<!--
-login
-date
-table of appointments
--->
