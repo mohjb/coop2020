@@ -1,7 +1,7 @@
 package moh.coop;
 
 /**
- * Created by moh on 16/4/20.
+ * Created by mohamadjb@gmail.com on 16/4/20.
  */
 import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import org.apache.commons.fileupload.FileItem;
@@ -55,6 +55,7 @@ public static void registerMethods(Class p) {
 	}
 }//registerHttpMethod
 
+//public static void Service(ServletRequest req, ServletResponse resp) {}
 @Override public void service(ServletRequest req, ServletResponse resp) {
 	HttpServletRequest request=(HttpServletRequest)req;
 	HttpServletResponse response=(HttpServletResponse)resp;

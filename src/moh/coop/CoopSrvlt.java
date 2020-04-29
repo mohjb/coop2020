@@ -1,5 +1,5 @@
 /**
- * Created by moh on 16/4/20.
+ * Created by mohamadjb@gmail.com on 16/4/20.
  */
 package moh.coop;
 /*
@@ -51,7 +51,7 @@ login(@HttpMethod(prmName="cid") String cid
 		tl.h.s("usr",tl.usr=u);
 		u.v("login",tl.now);
 		u.v("session",ct,2); //m.put("return",tl.now);
-		return byDates(lm,null,tl);
+		return Util.mapCreate("val",u.v(),"byDates",byDates(lm,null,tl));
 	}return null;}
 
 @HttpMethod public static Map chngPw(
@@ -78,12 +78,15 @@ login(@HttpMethod(prmName="cid") String cid
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
 	Prop t=typ==2?Coop.  load(id):typ==1?User.load(id):Prop.tl();
 	if(typ==0){t.cat=cat;t.id=id;t.load();}
-	if(path!=null && path.size()>=1)
-	{	path.add(p);
-		Util.bPath(t.v(),true,true,path.toArray());
-	}
-	t.save();
-	m.put("return",tl.now);
+	User.AccessLevel u=t.access(tl.usr.id);
+	//if( u.ordinal()>User.AccessLevel.Load.ordinal()) {
+		if(path != null && path.size() >= 1) {
+			path.add(p);
+			Util.bPath(t.v(), true, true, path.toArray());
+		}
+		t.save();
+		m.put("return", tl.now);
+	//}
 	return m;
 
 /**
@@ -98,7 +101,24 @@ login(@HttpMethod(prmName="cid") String cid
  for(Object ck:p.keySet()){
 
  }
- return m;}*/
+ return m;}
+
+
+ user-access-control
+    consumer
+        only consumer-profile , except coopId
+        readOnly coopId and coop.publicData
+
+    emp
+        InOut
+        empSignupApproveal
+        empAppointmentApproval
+        coopAdmin(Profile,config)
+        coopUsersAdmin(addingEmp, edit access-control)
+
+
+
+ */
 }
 
 @HttpMethod public static Map
@@ -111,13 +131,16 @@ updateMeta(@HttpMethod(prmName = "cat")String cat
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
 	Prop t=typ==2?Coop.  load(id):typ==1?User.load(id):Prop.tl();
 	if(typ==0){t.cat=cat;t.id=id;t.load();}
-	if(path!=null && path.size()>=1)
-	{	path.add(p);
-		Util.bPath(t.m(),true,true,path.toArray());
-	}
-	//t.updateMetaFromM();t.save();
-	m.put("return",tl.now);
-	return m;}
+
+	User.AccessLevel u=t.access(tl.usr.id);
+	if( u.ordinal()>User.AccessLevel.Load.ordinal()) {
+		if(path != null && path.size() >= 1) {
+			path.add(p);
+			Util.bPath(t.m(), true, true, path.toArray());
+		}
+		//t.updateMetaFromM();t.save();
+		m.put("return", tl.now);
+	}return m;}
 
 @HttpMethod public static Map
 insert(@HttpMethod(prmName="cat")String cat
@@ -130,11 +153,14 @@ insert(@HttpMethod(prmName="cat")String cat
 	t.cat=cat;t.id=id;
 	if(t.exists(t.wherePK(),null))
 		return null;
-	if(typ==2)
-		Coop.coops.put(id,(Coop)t);
-	t.setVal(p);//(new Json.Output()).o(p).toString()t.m=Util.mapCreate("creatorCID",tl.usr.cid);t.updateMetaFromM();
-	t.insert();
-	m.put("return",tl.now);
+
+	User.AccessLevel u=t.access(tl.usr.id);
+	//if( u.ordinal()>User.AccessLevel.Load.ordinal()) {
+		if(typ == 2)
+			Coop.coops.put(id, (Coop) t);
+		t.setVal(p);//(new Json.Output()).o(p).toString()t.m=Util.mapCreate("creatorCID",tl.usr.cid);t.updateMetaFromM();
+		t.insert();
+		m.put("return", tl.now);//}
 	return m;}
 
 @HttpMethod public static Map
@@ -166,10 +192,10 @@ public static class Prop extends Sql.Tbl {
 
 	@Override public List DBTblCreation(TL tl){
 		final String T="LongText",V=
-			                          "varchar(255) NOT NULL DEFAULT '??' ";
+		"varchar(255) NOT NULL DEFAULT '??' ";
 		return Util.lst(Util.lst(
-			"TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-			,V,V,T,T)
+				"TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+				,V,V,T,T)
 			,Util.lst("primary key(`"+C.cat+"`,`"+C.id+"`)",Util.lst(C.log))
 			,Util.lst(Util.lst(tl.now,"usr","root","{pw:\"\"}","{name:\"moh\",cid:\"root\",tel:\"99876454\",email:\"mohamadjb@gmail.com\",coopId:\"1\",govId:\"\",areaId:\"\",blockId:\"\",branchId:\"1\"}")
 				,Util.lst(tl.now,"coop","1","{pw:\"\"}","{label:\"main-coop\",cid:\"1\",tel:\"99876454\",email:\"mohamadjb@gmail.com\",branchs:[],govId:\"\",areaId:\"\",blockId:\"\"}")
@@ -212,7 +238,7 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		return this;
 	}//save
 
-	@Override public Sql.Tbl insert() throws Exception {
+@Override public Sql.Tbl insert() throws Exception {
 		if(log==null)log=new Date();
 		super.insert();
 		if(!(this instanceof Log))saveLog("insert");
@@ -243,23 +269,23 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		return t.prop;}
 
 	static Map byDates( Date d1,Date d2, TL tl)throws Exception{
-		if(tl.usr==null||d1==null)return null;
+	if(tl.usr==null||d1==null)return null;
 		Map m=Util.mapCreate();Prop t=tl();
 		Object[]where=d2==null
-			              ?where( //C.usr,u,
-			Util.lst( C.log,Co.gt),d1)
-			              :where(//C.usr,u,
-			Util.lst( C.log,Co.gt)
-			,d1 ,Util.lst( C.log,Co.le ),d2
-		);
+			?where( //C.usr,u,
+				Util.lst( C.log,Co.gt),d1)
+			:where(//C.usr,u,
+				Util.lst( C.log,Co.gt)
+				,d1 ,Util.lst( C.log,Co.le ),d2
+			);
 		for(Sql.Tbl r:t.query( where ))try{
 			int[]a=Util.dt2array( t.log );
 			Util.byPath( m,true,true
 				,a[0],a[1],a[2],a[3],a[4],a[5],a[6]
 				,t.cat,t.id,t.val // v() // ==null?t.val:t.v // TODO: check t.m().access / t.accessLevel():AccessLevel
-			);}catch(Exception x){
-			tl.error(x,"Prop.byDates:query:",r);
-		}
+				);}catch(Exception x){
+					tl.error(x,"Prop.byDates:query:",r);
+				}
 		return m;}
 
 
@@ -300,7 +326,7 @@ PRIMARY KEY (`cat`,`id`,`log`)
 	public Object v(String n,Object x){return v(n,x,0);}
 	public Object v(String n,Object x,int lvl){
 		try{v().put(n,x);
-			if(lvl>1)
+		if(lvl>1)
 				save();
 		}catch(Exception ex){}
 		return x;}
@@ -318,12 +344,12 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		else if(meta instanceof Map)
 			return (Map)meta;
 		else try{
-				meta=(new Json.Prsr()).parse(meta.toString());
-				if(meta instanceof Map)
-					return (Map)meta;
-				TL.tl().log("Prop.m:meta not Map:",meta);
-			}catch(Exception ex){}
-		return null;}
+			meta=(new Json.Prsr()).parse(meta.toString());
+			if(meta instanceof Map)
+				return (Map)meta;
+			TL.tl().log("Prop.m:meta not Map:",meta);
+	}catch(Exception ex){}
+	return null;}
 
 	public Object mo(String n){
 		return m().get(n);}
@@ -349,15 +375,22 @@ PRIMARY KEY (`cat`,`id`,`log`)
 			setVal(v);
 		else if(C.meta.getName().equals(pn))
 			setMeta(v);else
-			super.v(p,v);
+		super.v(p,v);
 		return this;
 	}
 
 	@Override public Object valForSql(CI f){
-		if(f==C.val || f==C.meta){
-			String s=Json.Output.out( f==C.val ?val:meta );
-			return s;
-		}return super.valForSql(f);}
+	  if(f==C.val || f==C.meta){
+		String s=Json.Output.out( f==C.val ?val:meta );
+		return s;
+	}return super.valForSql(f);}
+
+	/**what accessLevel does the current user have access to id through this object?*/
+	public User.AccessLevel access(String id){
+		User.AccessLevel x=User.AccessLevel.Non;
+		return x;}
+
+
 } // class Prop extends Tbl
 
 public static class Log extends Prop{
@@ -396,8 +429,8 @@ public static class User extends Prop{
 		User u=new User(),x=null;
 		for(Sql.Tbl t:u.query(where(C.id,cid,C.cat,"usr"),true))
 			x=x==null
-				  ?(User)t
-				  :x;
+				?(User)t
+				:x;
 		//if(x!=null)try{x.cid=cid;x.pw=x.m("pw");x.state=State.valueOf(x.v("state"));}catch(Exception ex){}
 		return x;}
 
@@ -405,28 +438,20 @@ public static class User extends Prop{
 	public State state(){
 		try{String x=v("state");
 			return x==null
-				       ?State.Non
-				       :State.valueOf(x);
+				?State.Non
+				:State.valueOf(x);
 		}catch(Exception ex){
 		}
 		return State.Non;}
-	public Coop.AccessLevel accessLevel(){
-		try{String x=v("state");
-			return x==null
-				?Coop.AccessLevel.Non
-				:Coop.AccessLevel.valueOf(x);
-		}catch(Exception ex){
-		}
-		return Coop.AccessLevel.Non;}
 
-	public Coop.UserRole userRole(){
+	public User.AccessLevel access(String cid){
 		try{String x=v("state");
 			return x==null
-				?Coop.UserRole.consumer
-				:Coop.UserRole.valueOf(x);
+				?AccessLevel.Non
+				:AccessLevel.valueOf(x);
 		}catch(Exception ex){
 		}
-		return Coop.UserRole.consumer;}
+		return AccessLevel.Non;}
 
 	public boolean chngPw(String pw){
 		String x=Util.md5(pw);
@@ -452,16 +477,26 @@ public static class User extends Prop{
 		return super.v(n,x,lvl);
 	}
 
-	public enum State{Non
-		,SignupPending
-		,ProfilePending
-		,Ready  //  ,Loggedout
-		,QueuePending
-		,Queued
-		,Auth2enter
-		,InCoop
-		,QuotaPending
-	} // enum State
+public enum State{Non
+	,SignupPending
+	,ProfilePending
+	,Ready  //  ,Loggedout
+	,QueuePending
+	,Queued
+	,Auth2enter
+	,InCoop
+	,QuotaPending
+} // enum State
+
+public enum AccessLevel{Non
+	,List   //assets: emp,coop,access
+	,Load
+	,Edit
+	,Admin //,Write,Create,Delete
+	,Super // EditAccess , createUser
+}
+
+public enum UserRole{consumer,inOut,signupApproveal,appointmentApproval,coopAdmin,coopUsersAdmin}
 
 }//class User extends Prop extends Tbl
 
@@ -507,15 +542,23 @@ public static class Coop extends Prop{
 		cat="coop";return super.insert();}
 
 	//List generateApts(Date day){}
-	public enum AccessLevel{Non
-		,List
-		,Load
-		,Edit
-		,Admin //,Write,Create,Delete
-		,Super // EditAccess , createUser
-	}
 
-	public enum UserRole{consumer,empInOut,empSignupApproveal,empAppointmentApproval}
+	Map emps(){
+		Object o=m("emps");
+		Map m=o instanceof Map?(Map)o:null;
+		return m;}
+
+	List consumers(){
+		Object o=m("consumers");
+		List m=o instanceof List?(List)o:null;
+		return m;}
+
+	@Override public User.AccessLevel access(String cid){
+		Map e=emps();
+		Object o=e==null?e:e.get(cid);
+		return o instanceof User.AccessLevel
+			?(User.AccessLevel)o
+			:User.AccessLevel .Non;}
 
 }//class Coop extends Prop
 

@@ -1,0 +1,188 @@
+<html ng-app="app" ng-controller="MainCtrl"><body>
+<script src="/angular-1.6.4/angular.min.js"></script>
+<script defered>
+(window.xa=app=(angular||{}).module('app', [] ))
+
+now=()=>(new Date()).getTime();
+
+did=p=>document.getElementById(p);
+//String.prototype.startsWith=s=>this.substr(s.length)=s
+
+app.controller('MainCtrl',['$scope',
+function mainCtrlController($scope,$rootScope ) {
+	var p=app.p=$scope ;p.app=app;
+
+	p.newId=function(){return now();}
+
+	p.sessionStart=new Date();
+
+	p.addLstnr=function(cat,id,o,mthdNm){
+		var x=p.lstnrs[cat],y
+		if(!x)
+		x=p.lstnrs[cat]={}
+		y=x[id]
+		if(!y)
+			y=x[id]=[]
+		y.push({o:o,mthdNm:mthdNm})
+	}
+
+	p.fireLstnrs=function(cat,id){
+		var x=p.lstnrs[cat],y,o
+		if(!x)
+		x=p.lstnrs[cat]={}
+		y=x[id]
+		if(y)for(var i in y)try{
+			x=y[i]
+			o=x.o
+			o[x.mthdNm](cat,id,o)
+		}catch(ex){
+			console.error(ex,cat,id,x,);}
+	}
+
+	p.onChngCoop=function(id){}
+	p.onChngUsr=function(id){}
+
+	p.onByDate=function(data){var d=[],x
+		for(var y in data){d[1]=data[y]
+		for(var mnth in d[1]){d[2]=d[1][mnth]
+		for(var dy in d[2]){d[3]=d[2][dy]
+		for(var hr in d[3]){d[4]=d[3][hr]
+		for(var mn in d[4]){d[5]=d[4][mn]
+		for(var sc in d[5]){d[6]=d[5][sc]
+		for(var ms in d[6]){d[7]=d[6][ms]
+		for(var cat in d[7]){d[8]=d[7][cat]
+		for(var id in d[8]){o=d[8][id]
+			x=new Date(y,mnth,dy,hr,mn,sc,ms).getTime() // 
+			if(p.usrls.srvrLM<x)p.usrls.srvrLM=x
+			p.saveLSProp(cat,id,o)
+			p.onSrvrChng(cat,id,o)
+	}}}}}}}}}}
+
+	p.onSrvrChng=function(cat,id,prop){
+		p.fireLstnrs(cat,id,prop)}
+
+	p.loadLSProps=function(){
+		var a=[],ls={},ks,b,cat,id,c,o,log=0
+		for(var k in localStorage)
+		{ks=k.toString()
+		 if(ks.substr(0,6)=='coop1|')
+		{b=ks.split('|')
+		 if(b.length==3){
+			cat=b[1];id=b[1];
+			if(!(c=ls[cat]))
+				c=ls[cat]={}
+			o=localStorage[k]
+			o=JSON.parse(o)
+			c[id]=o;
+			if(log<o.log)
+				log=o.log;
+		 }
+		}}return {ls:ls,log:log};
+	}
+
+	p.saveLSProps=function(ls){
+		var d,o,k
+		for(var cat in ls){d=ls[cat]
+		for(var id in d){o=d[id]
+			p.saveLSProp(cat,id,o)
+		}}}
+
+//prop::= log,cat,id,meta,val
+	p.saveLSProp=function(cat,id,prop){
+		var k='coop1|'+cat+'|'+id
+		,s=JSON.stringify(prop);
+		localStorage[k]=s;
+		return s;}
+	p.saveLSUsr=function(){
+		localStorage.coop1Usr=JSON.stringify(p.usrls);}
+
+p.srvr={
+url:'http://localhost:8080/coop/index.jsp'
+,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'post',data:{op:'signup',cid:cid,pw:pw,val:val}})
+,login	:(cid,pw,lastModified,clientTime)=>fetch(p.srvr.url,{method:'post',data:{op:'login',cid:cid,pw:pw,lastModified:lastModified,clientTime:clientTime}})
+,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'post',data:{op:'chngPw',pw:pw,clientTime:clientTime}})
+,update	:(cat,id,path,val)=>fetch(p.srvr.url,{method:'post',data:{op:'update',cat:cat,id:id,path:path,val:val}})
+,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url,{method:'post',data:{op:'updateMeta',cat:cat,id:id,path:path,meta:meta}})
+,insert	:(cat,id,val)	=>fetch(p.srvr.url,{method:'post',data:{op:'insert',cat:cat,id:id,val:val}})
+,byDates	:(from,to)		=>fetch(p.srvr.url,{method:'post',data:{op:'byDates',from:from,to:to}})
+
+}//srvr
+
+	p.usrLogin=()=>{
+		var n=p.inp,dt=now();
+		p.srvr.login(n.cid,n.pw,n.lm,now())
+		.then(r=>r.json())
+		.then(r=>{
+			if(r)
+			{	p.usrls.val=p.usr=r.val;
+				p.onByDate(r.byDates)
+				p.screen='consumer'
+				return p.saveLSUsr()}
+			else
+				alert('invalid login');
+			})
+	}//clkLogin
+
+	p.usrLogin.init=function(sv){
+		var x=localStorage.coop1Usr
+		if(x)
+			p.usrls=JSON.parse(x);
+		else{
+			p.usrls={usrId:p.newId(),coopId:0,srvrLM:0} // p.usrls.cid=p.usrls.usrId;
+			if(sv)p.saveLSUsr();}
+		p.screen='consumer'
+	}
+
+	p.loadLSProps()
+	p.usrLogin.init()
+
+	p.lstnrs={}//cat/id/{o:<obj:lstnr>,mthdNm:<str:mthdNm ,in lstnr>}
+	p.inp={}
+
+	console.log('controller:MainCntrl: app=',app,' ,scope=',p )
+}
+]
+)
+</script>
+<h1>Coop Appointments</h1>
+xhr
+
+<fieldset><legend>login</legend>
+<form id=frmLogin><table border=1>
+<tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
+<tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
+</table><input type="button" ng-click="usrLogin()" value="Login" /></form>
+<div id=loginInfo></div>
+</fieldset>
+
+<fieldset><legend>logout</legend>
+</fieldset>
+
+<fieldset><legend>signup</legend>
+</fieldset>
+
+<fieldset><legend>byDate</legend>
+</fieldset>
+
+<fieldset><legend>chngPw</legend>
+</fieldset>
+
+<fieldset><legend>insert</legend>
+</fieldset>
+
+<fieldset><legend>update</legend>
+</fieldset>
+
+<fieldset><legend>updateMeta<legend>
+</fieldset>
+
+<br/>mbohamad@kisr.edu.kw
+</body>
+</html>
+
+
+<!--
+login
+date
+table of appointments
+-->
