@@ -30,8 +30,8 @@ import java.util.Date;
 public class M extends Dbg.Srvlt{
 
 final static String packageName="coop"
-	,jspName="index.jsp"
-	, SrvltName = packageName + "."+jspName;
+	//,jspName="index.jsp", SrvltName = packageName + "."+jspName
+	,SrvltName ="CoopSrvlt";
 
 static void staticInit() {
 	registerMethods(CoopSrvlt.class);
@@ -55,7 +55,6 @@ public static void registerMethods(Class p) {
 	}
 }//registerHttpMethod
 
-//public static void Service(ServletRequest req, ServletResponse resp) {}
 @Override public void service(ServletRequest req, ServletResponse resp) {
 	HttpServletRequest request=(HttpServletRequest)req;
 	HttpServletResponse response=(HttpServletResponse)resp;
@@ -64,21 +63,21 @@ public static void registerMethods(Class p) {
 	try {
 		tl = TL.Enter(request, response);
 		tl.h.r("contentType", "text/json");
-		String hm = tl.h.req("op");if(hm==null)tl.h.req.getMethod();
+		String hm = tl.h.req("op");if(hm==null)hm=tl.h.req.getMethod();
 		Method op = mth.get(hm);
 		if(op == null)
 			for(String s : mth.keySet())
 				if(s.equalsIgnoreCase(hm))
 					op = mth.get(s);
 		HttpMethod httpMethodAnno = op == null ? null : op.getAnnotation(HttpMethod.class);
-		tl.log("_jsp:version2017.02.09.17.10:op=", op, httpMethodAnno);
+		tl.log(SrvltName,":version2020.05.01.04.25:op=", op, httpMethodAnno,",urlParts=",tl.h.url);
 		if(tl.usr == null && (httpMethodAnno == null || httpMethodAnno.usrLoginNeeded()))
 			op = null;
 		if(op != null) {
 			Class[] prmTypes = op.getParameterTypes();
 			Class cl = op.getDeclaringClass();
 			Annotation[][] prmsAnno = op.getParameterAnnotations();
-			int n = prmsAnno == null ? 0 : prmsAnno.length, i = - 1;tl.h.urli=-2;
+			int n = prmsAnno == null ? 0 : prmsAnno.length, i = - 1;
 			Object[] args = new Object[n];
 
 			for(Annotation[] t : prmsAnno) try {
@@ -87,8 +86,9 @@ public static void registerMethods(Class p) {
 				String nm = pp != null ? pp.prmName() : "arg" + i;//t.getName();
 				Object o ;
 				if(pp != null && pp.prmUrlPart()) {
-					if(String.class.isAssignableFrom(prmClss))args[i]=tl.h.url[tl.h.urli++];
-					else args[i]=Util.parse(tl.h.url[tl.h.urli++],prmClss);
+					o=tl.h.url==null||tl.h.url.length<=tl.h.urli?null:tl.h.url[tl.h.urli++];
+					if(String.class.isAssignableFrom(prmClss))args[i]=o;
+					else args[i]=o==null?null:Util.parse((String)o,prmClss);
 				} else if(pp != null && pp.prmUrlRemaining()) {
 					if(tl.h.url!=null&&tl.h.urli<tl.h.url.length) {
 						if(List.class.isAssignableFrom(prmClss)){
@@ -135,6 +135,7 @@ public static void registerMethods(Class p) {
 				: n == 3 ? op.invoke(cl, args[0], args[1], args[2])
 				: n == 4 ? op.invoke(cl, args[0], args[1], args[2], args[3])
 				: n == 5 ? op.invoke(cl, args[0], args[1], args[2], args[3], args[4])
+				: n == 5 ? op.invoke(cl, args[0], args[1], args[2], args[3], args[4], args[5])
 				: op.invoke(cl, args);
 			if(httpMethodAnno != null && httpMethodAnno.nestJsonReq() && tl.json != null) {
 				tl.json.put("return", retVal);
@@ -277,8 +278,8 @@ public static class TL{
 				Sql.Tbl.check(this);
 			Object o=h.req.getContentType();
 			bodyData=o==null?null
-				         :o.toString().contains("json")?Json.Prsr.parse(h.req)
-					          :o.toString().contains("part")?h.getMultiParts():null;
+				:o.toString().contains("json")?Json.Prsr.parse(h.req)
+				:o.toString().contains("part")?h.getMultiParts():null;
 			json=bodyData instanceof Map<?, ?>?(Map<String, Object>)bodyData:null;
 			if(json==null){
 				Map<String,String[]>a=h.req.getParameterMap();
@@ -291,7 +292,14 @@ public static class TL{
 			}
 			if((o=h.s("usr")) instanceof CoopSrvlt.User)
 				usr=(CoopSrvlt.User)o;
-			h.url=h.req.getRequestURI().split("/");
+			String s=h.req.getRequestURI();     //changed 2020-05-01
+			if(s.startsWith("/"))s=s.substring(1);
+			if(s.startsWith(SrvltName)){
+				s=s.substring(SrvltName.length());
+				if(s.startsWith("/"))s=s.substring(1);
+			}
+			h.url=s.split("/");
+			h.urli=h.url.length>0&&h.url[0]!=null&&h.url[0].length()<1 ?1:0;//( || SrvltName.equals(h.url[0]))
 		}catch(Exception ex){
 			error(ex,TlName,".onEnter");
 		}
@@ -308,7 +316,7 @@ public static class TL{
 		p.onExit();tl.set(null);}
 
 	public class H{
-		public boolean logOut=false;public int urli;
+		public boolean logOut=false,logDbg=true;public int urli;
 		public String ip,comments[]=CommentJson,url[];
 		public HttpServletRequest req;
 		public HttpServletResponse rspns;
@@ -504,7 +512,7 @@ public static class TL{
 		jo().clrSW();
 		for(Object t:s)if(t instanceof String)jo.w(String.valueOf(t));else jo.o(t);
 		String t=jo.toStrin_();
-		h.getServletContext().log(t);System.out.println(t);
+		h.getServletContext().log(t);if(h.logDbg)System.out.println(t);
 		if(h.logOut)out.flush().w(h.comments[0]).w(t).w(h.comments[1]);
 	}catch(Exception ex){
 		ex.printStackTrace();
@@ -1901,13 +1909,8 @@ public static class Sql {
 	 when first time called, all next calls uses this context.Sql.pool.str*/
 	public static synchronized Connection c()throws SQLException {return c(TL.tl());}
 	public static synchronized Connection c(TL t)throws SQLException {
-		//Object[]p=null,a=stack(t,null);//Object[])t.s(context.Sql.reqCon.str);
-		//Connection r=(Connection)a[0];//a ==null?null:
 		if(t.c!=null)return t.c;
-		//pool=(MysqlConnectionPoolDataSource)t.h.a(context.DB.pool.str); ////MysqlConnectionPoolDataSource d
 		t.c=pool==null?null:pool.getPooledConnection().getConnection();
-		//if(t.c!=null)
-		//	a[0]=r;//changed 2017.07.14
 		if(t.c==null)//else
 			try
 			{try{int x=context.getContextIndex(t);
@@ -1943,11 +1946,10 @@ public static class Sql {
 		//if(t.h.logOut)t.log(context.DB.pool.str+":"+t.c); // (p==null?null:p[0])
 		if(t.c==null)try
 		{t.c=java.sql.DriverManager.getConnection
-			                            ("jdbc:mysql://"+context.DB.server.str
-				                             +"/"+context.DB.dbName.str
-				                            ,context.DB.un.str,context.DB.pw.str
-			                            );Object[]b={t.c,null};
-			//t.h.s(context.DB.reqCon.str,b);
+			("jdbc:mysql://"+context.DB.server.str
+				+"/"+context.DB.dbName.str
+				,context.DB.un.str,context.DB.pw.str
+			);Object[]b={t.c,null};
 		}catch(Throwable e){
 			t.error(e,SrvltName,".Sql.DriverManager:");
 		}
@@ -1981,8 +1983,8 @@ public static class Sql {
 		if(odd){if(p.length==1)
 			r.setObject(1,p[0]);else
 			for(int i=1,n=p.length;p!=null&&i<n;i+=2)if((!(p[i] instanceof List))
-				                                            && !(p[i] instanceof Tbl.CI) //added 2018.12.17 10:58 for Co.max
-				                                         ) // ||!(p[i-1] instanceof List)||((List)p[i-1]).size()!=2||((List)p[i-1]).get(1)!=Tbl.Co.in )
+				&& !(p[i] instanceof Tbl.CI) //added 2018.12.17 10:58 for Co.max
+				) // ||!(p[i-1] instanceof List)||((List)p[i-1]).size()!=2||((List)p[i-1]).get(1)!=Tbl.Co.in )
 				r.setObject(i/2+1,p[i]);//if(t.logOut)TL.log("dbP:"+i+":"+p[i]);
 		}else
 			for(int i=0;p!=null&&i<p.length;i++)
@@ -2020,46 +2022,7 @@ public static class Sql {
 			r.close();s.close();
 			if(//l==null&&
 				closeC)close(tl);
-/*close(tl.c,tl);
-	public static void close(Connection c,TL tl){
-		try{if(c!=null){
-			/*List<ResultSet>a=stack(tl,false);
-			if(a==null||a.size()<1)
-				tl.h.s(context.DB.reqCon.str,a=null);
-			if(a==null)* /
-				c.close();tl.c=null;}
-	}catch(Exception e){
-		e.printStackTrace();
-	}
-	/*static Object[]stack(TL tl,Connection c){return stack(tl,c,true);}
-	static Object[]stack(TL tl,Connection c,boolean createIfNotExists){
-		return stack(tl,c,createIfNotExists,false);}
-	static Object[]stack(TL tl,Connection c,boolean createIfNotExists,boolean deleteArray){
-		if(tl==null)tl=TL.tl();Object o=context.DB.reqCon.str;
-		Object[]a=(Object[])tl.h.s(o);
-		if(deleteArray)
-			tl.h.s(o,a=null);
-		else if(a==null&&createIfNotExists)
-		{Object[]b={c,null};
-			tl.h.s(o,a=b);}
-		return a;}
-	static List<ResultSet>stack(TL tl){return stack(tl,true);}
-	static List<ResultSet>stack(TL tl,boolean createIfNotExists){
-		Object[]a=stack(tl,null,createIfNotExists);
-		List<ResultSet>l=a==null||a.length<2?null:(List<ResultSet>)a[1];
-		if(l==null&&createIfNotExists)
-			a[1]=l=new LinkedList<ResultSet>();
-		return l;}
-	static void push(ResultSet r,TL tl){try{//2017.07.14
-		List<ResultSet>l=stack(tl);//if(l==null){stack(tl,null)[1]=l=new LinkedList<ResultSet>();l.add(r);}else
-		if(!l.contains(r))
-			l.add(r);
-	}catch (Exception ex){
-		tl.error(ex,SrvltName,".Sql.push");
-	}}
 
-	//public static void close(Connection c){close(c,tl());}* /}
-				   */
 		}catch(Exception e){
 			e.printStackTrace();
 		}
@@ -2171,7 +2134,7 @@ public static class Sql {
 	public static int x(String sql,Object...p)throws SQLException{return X(sql,p);}
 	public static int X(String sql,Object[]p)throws SQLException {
 		int r=-1;try{PreparedStatement s=P(sql,p,false);r=s.executeUpdate();s.close();return r;}
-		finally{TL t=TL.tl();if(t.h.logOut)try{
+		finally{TL t=TL.tl();if(t.h.logOut )try{
 			t.log(t.jo().w(SrvltName).w(".Sql.x:sql=").o(sql).w(",prms=").o(p).w(",return=").o(r).toStrin_());}
 		catch(IOException x){
 			t.error(x,SrvltName,".Sql.X:",sql);
@@ -2680,7 +2643,8 @@ public static class Sql {
 		public Itrtr query(Object[]where){
 			Itrtr r=new Itrtr(where);
 			return r;}
-		public Itrtr query(String sql,Object[]where,boolean makeClones){
+		public Itrtr query(String sql,
+			Object[] where,boolean makeClones){
 			return new Itrtr(sql,where,makeClones);}
 		public Itrtr query(Object[]where,boolean makeClones){return query(columns(),where,null,makeClones);}
 		public Itrtr query(CI[]cols,Object[]where,CI[]groupBy,boolean makeClones){//return query(sql(cols,where,groupBy),where,makeClones);}//public Itrtr query(String sql,Object[]where,boolean makeClones){
@@ -2850,7 +2814,9 @@ public static class Sql {
 		}
 		}//outputJson(Object...where)
 		public static List<Class<? extends Tbl>>registered=new LinkedList<Class<? extends Tbl>>(); // </ > </ >
-		static void check(TL tl){
+		static void check(TL tl){try{
+			CoopSrvlt.Prop.class.toString();
+			CoopSrvlt.Log .class.toString();
 			for(Class<? extends Tbl>c:registered)try
 			{String n=c.getName(),n2=SrvltName+".checkDBTCreation."+n;
 				if( tl.h.a(n2)==null){
@@ -2858,8 +2824,12 @@ public static class Sql {
 					t.checkDBTCreation(tl);
 					tl.h.a(n2,tl.now);
 				}}catch(Exception ex){
+					tl.error( ex,SrvltName,".Sql.Tbl.check" );
+				}
+			}catch(Exception ex){
 				tl.error( ex,SrvltName,".Sql.Tbl.check" );
-			} }
+			}
+		}
 
 		public static boolean exists(Object[]where,String dbtName){return exists(where,null,dbtName);}
 

@@ -29,7 +29,7 @@ signup(@HttpMethod(prmName="cid") String cid
 			c.v("signupReq",l=Util.lst());
 		if(!l.contains(cid))
 		{l.add(cid);
-			c.v("signupReq",l,2);}
+			c.v("signupReq",l,true);}
 		u.setVal(val);
 		u.v("state",User.State.SignupPending.toString());
 		u.v("cid",u.id=cid);
@@ -51,7 +51,7 @@ login(@HttpMethod(prmUrlPart = true) String cid//prmName="cid"
 		tl.h.s("cid",cid);
 		tl.h.s("usr",tl.usr=u);
 		u.v("login",tl.now);
-		u.v("session",ct,2); //m.put("return",tl.now);
+		u.v("session",ct,true); //m.put("return",tl.now);
 		tl.log("CoopSrvlt.login:1:ok:");
 		return Util.mapCreate("val",u.v(),"byDates",Prop.byDates(lm,null,tl));
 	}tl.log("CoopSrvlt.login:2:return null;");return null;}
@@ -67,7 +67,7 @@ chngPw(@HttpMethod(prmName = "pw") String pw
 	}return null;}
 
 @HttpMethod public static void logout(TL tl){
-	tl.usr.v("logout",tl.now,2);
+	tl.usr.v("logout",tl.now,true);
 	tl.h.s("cid",tl.h.s("usr",tl.usr =null));}
 
 @HttpMethod public static Map //update
@@ -125,7 +125,7 @@ put(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
 
 @HttpMethod public static Map // updateMeta
 patch(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
-	     ,@HttpMethod(prmUrlPart = true)String id // prmName="id"
+	,@HttpMethod(prmUrlPart = true)String id // prmName="id"
 	,@HttpMethod(prmUrlRemaining = true)List path // prmName = "path"
 	,@HttpMethod(prmBody = true)Object p // prmName = "meta"
 	,TL tl)throws Exception {
@@ -297,12 +297,7 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		return p;
 	}
 
-	public Map v()throws Exception{/*
-		if(val==null)
-			val=new HashMap();
-		else if(!(val instanceof Map))
-			throw new Exception("Prop.v: val not Map");
-		return (Map)val;*/
+	public Map v()throws Exception{
 		if(val==null)
 			val=new HashMap();
 		else if(val instanceof Map)
@@ -324,11 +319,11 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		return s;
 	}
 
-	public Object v(String n,Object x){return v(n,x,0);}
-	public Object v(String n,Object x,int lvl){
+	public Object v(String n,Object x){return v(n,x,false);}
+	public Object v(String n,Object x,boolean save){
 		try{v().put(n,x);
-		if(lvl>1)
-				save();
+		if(save)
+			save();
 		}catch(Exception ex){}
 		return x;}
 
@@ -460,7 +455,7 @@ public static class User extends Prop{
 		return true;}
 
 	public boolean chngCoopId(String coopId){
-		v("coopId",coopId,2);
+		v("coopId",coopId,true);
 		return true;}
 
 	@Override public Sql.Tbl save() throws Exception {
@@ -468,14 +463,14 @@ public static class User extends Prop{
 	@Override public Sql.Tbl insert() throws Exception {
 		cat="usr";return super.insert();}
 
-	@Override public Object v(String n,Object x,int lvl){
+	@Override public Object v(String n,Object x,boolean save){
 		if("state".equalsIgnoreCase(n)){
 			try{state=x instanceof State?(State)x:State.valueOf(x.toString());}catch(Exception ex){}
 			x=state==null?null:state.toString();
 		}else if("pw".equalsIgnoreCase(n)){
 			return null;//x=state==null?null:state.toString();
 		}
-		return super.v(n,x,lvl);
+		return super.v(n,x,save);
 	}
 
 public enum State{Non
@@ -528,7 +523,7 @@ public static class Coop extends Prop{
 		if(l==null)
 			x.v("emps",l=Util.lst());
 		if(!l.contains(cid))l.add(cid);
-		x.v("created",TL.tl().now,2);
+		x.v("created",TL.tl().now,true);
 		return x;}
 
 	static Coop load(String id){
@@ -566,4 +561,3 @@ public static class Coop extends Prop{
 public static CoopSrvlt sttc=new CoopSrvlt();
 
 }// CoopSrvlt
-
