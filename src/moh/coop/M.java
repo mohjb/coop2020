@@ -29,8 +29,7 @@ import java.util.Date;
 
 public class M extends Dbg.Srvlt{
 
-final static String packageName="coop"
-	//,jspName="index.jsp", SrvltName = packageName + "."+jspName
+final static String packageName="coop"//,jspName="index.jsp", SrvltName = packageName + "."+jspName
 	,SrvltName ="CoopSrvlt";
 
 static void staticInit() {
@@ -70,7 +69,7 @@ public static void registerMethods(Class p) {
 				if(s.equalsIgnoreCase(hm))
 					op = mth.get(s);
 		HttpMethod httpMethodAnno = op == null ? null : op.getAnnotation(HttpMethod.class);
-		tl.log(SrvltName,":version2020.05.01.04.25:op=", op, httpMethodAnno,",urlParts=",tl.h.url);
+		tl.log(SrvltName,":version2020.05.03.23.14:bodyData=",tl.bodyData,",urlParts=",tl.h.url ,",op=", op, httpMethodAnno);
 		if(tl.usr == null && (httpMethodAnno == null || httpMethodAnno.usrLoginNeeded()))
 			op = null;
 		if(op != null) {
@@ -119,16 +118,19 @@ public static void registerMethods(Class p) {
 						else if(o instanceof Object[]) f.vals((Object[]) o);
 						else f.readReq("");}
 				}
-				else if(pp != null && pp.prmBody())
-					args[i] = prmClss.isAssignableFrom(String.class)
-			          ? Util.readString(tl.h.req.getReader())
-			          : tl.bodyData;
-				else
+				else if(pp != null && pp.prmBody()) {
+					boolean b=String.class.equals(prmClss);//prmClss.isAssignableFrom(String.class)
+					if(b) { BufferedReader x=tl.h.req.getReader();
+						args[i] = Util.readString(x);
+					}else
+						 args[i]= tl.bodyData;
+				}else
 					args[i] = TL.class.equals(prmClss) ? tl
 						: tl.h.req(nm, prmClss);
 			} catch(Exception ex) {
 				tl.error(ex, SrvltName, ".service:arg:i=", i);
 			}
+			tl.log(SrvltName,":service:urlParts=",tl.h.url,",args=",args);
 			retVal = n == 0 ? op.invoke(cl)
 				: n == 1 ? op.invoke(cl, args[0])
 				: n == 2 ? op.invoke(cl, args[0], args[1])
@@ -326,8 +328,7 @@ public static class TL{
 		Map getMultiParts(){
 			Map<Object,Object>m=null;
 			if( ServletFileUpload.isMultipartContent(req))try
-			{
-				DiskFileItemFactory factory=new DiskFileItemFactory();
+			{	DiskFileItemFactory factory=new DiskFileItemFactory();
 				factory.setSizeThreshold(40000000);//MemoryThreshold);
 				String path="";//Srvlt.UploadPth;//app(this).getUploadPath();
 				String real=context.getRealPath(TL.this, path);//getServletContext().getRealPath(path);
@@ -631,7 +632,7 @@ public static class Util{ //utility methods
 			List l=(List)o;
 			if(i<0)
 				i+=l.size();
-			l.set(i,v);
+			if(i==l.size())l.add(v);else l.set(i,v);
 		}else if(o instanceof Object[]){
 			int i=p instanceof Number?((Number)p).intValue():Util.parseInt(p==null?null:p.toString(),0);
 			Object[]a=(Object[])o;
@@ -1439,7 +1440,7 @@ public static class Json {
 		public static Object parse(Reader p) throws Exception {
 			if (p == null) return null;
 			Prsr j = new Prsr();
-			j.rdr = p;
+			j.rdr = p;if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.parse(Reader):",p);
 			j.nxt(j.c = j.read());
 			return j.parse();
 		}//public static Object parseItem(Reader p)throws Exception{ Prsr j=new Prsr();j.rdr=p;j.nxt(j.c=j.read());return j.parseItem();}
@@ -1771,6 +1772,7 @@ public static class Json {
 			int h = -1;
 			try {
 				h = rdr.read();
+				if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.read:(",_row,",",_col,"):",h,":",(char)h);
 			} catch (Exception ex) {
 				TL.tl().error(ex, "TL.Json.Prsr.read");
 			}
@@ -2291,14 +2293,7 @@ public static class Sql {
 			int i=-1;
 			for(CI f:a){i++;
 				r[i]=valForSql(a[i]);
-			}return r;/*
-		public Object[]_vals(){
-			CI[]a=columns();//Field[]a=fields();
-			Object[]r=new Object[a.length];
-			int i=-1;
-			for(CI f:a){i++;
-				r[i]=v(a[i]);
-			}return r;}*/}
+			}return r;}
 
 		public Object valForSql(CI f){
 			Object o=v(f);
@@ -2502,8 +2497,8 @@ public static class Sql {
 		}//checkTableCreation
 		/**where[]={col-name , param}*/
 		public int count(Object[]where) throws Exception{return count(where,null,getName());}
-		public static int count(Object[]where,CI[]groupBy,String name) throws Exception{
-			String sql=sql(cols(Co.count),where,groupBy,null,name);//new StringBuilder("select count(*) from `").append(getName()).append("` where `").append(where[0]).append("`=").append(Co.m(where[0]).txt);//where[0]instanceof CI?m((CI)where[0]):'?');
+		public static int count(Object[]where,CI[]groupBy,String tblName) throws Exception{
+			String sql=sql(cols(Co.count),where,groupBy,null,tblName);//new StringBuilder("select count(*) from `").append(getName()).append("` where `").append(where[0]).append("`=").append(Co.m(where[0]).txt);//where[0]instanceof CI?m((CI)where[0]):'?');
 			return Sql.q1int(sql,-1,where[0],where[1]);}
 		public int maxPlus1(CI col) throws Exception{
 			String sql=sql("max(`"+col+"`)+1",null,null,null);
@@ -2631,7 +2626,7 @@ public static class Sql {
 		public int delete() throws SQLException{
 			int x=-1;Object[]where=wherePK();
 			StringBuilder b=new StringBuilder( "delete from `" )
-				                .append( getName() ).append("`" );
+				.append( getName() ).append("`" );
 			Co.where( b,where );
 			x= Sql.X( b.toString(),where );
 			return x;}
@@ -2833,17 +2828,14 @@ public static class Sql {
 
 		public static boolean exists(Object[]where,String dbtName){return exists(where,null,dbtName);}
 
-		public static boolean exists(Object[]where,CI[]groupBy,String dbtName){
-			boolean b=false;
+		public static boolean exists(Object[]where,CI[]groupBy,String dbtName){// minor modification 2020/05/03
 			int n=0;
-			try{n=count( where,groupBy,dbtName );}catch ( Exception ex ){}
-			b=n>0;
+			try{n=count( where,groupBy,dbtName);}catch ( Exception ex ){}boolean b=n>0;
 			return b;
 		}
 	}//class Tbl
 }//class Sql
 
 //////////////////////////////////////////////////////////////////////
-
 
 }//class MySrvlt

@@ -99,17 +99,28 @@ function mainCtrlController($scope,$rootScope ) {
 
 p.srvr={
 url:'http://localhost:8080/CoopSrvlt/'
-,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'signup',body:JSON.stringify({cid:cid,pw:btoa(pw),val:val})})
+,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'post'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify({op:'signup',cid:cid,pw:btoa(pw),val:val})})
 ,login	:(cid,pw,lm,clientTime)=>{
-	var s=p.srvr.url+cid+'/'+lm+'/'+clientTime;
+	var s=p.srvr.url+cid;
 	console.log('srvr.login:',lm,s);
-	return fetch(s,{method:'login',body:
-		JSON.stringify({pw:btoa(pw)})})}
-,logout	:()=>{var s=p.srvr.url;console.log('srvr.logout:',s);return fetch(s,{method:'logout'})}
-,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'chngPw',body:JSON.stringify({pw:btoa(pw),clientTime:clientTime})})
-,update	:(cat,id,path,lm,val)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'put',body:JSON.stringify(val)})
-,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'patch',body:JSON.stringify(meta)})
-,insert	:(cat,id,val)	=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'post',body:JSON.stringify(val)})
+	return fetch(s,{method:'post'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify({op:'login',pw:btoa(pw),lm:lm,clientTime:clientTime})})}
+,logout	:()=>{var s=p.srvr.url;console.log('srvr.logout:',s);return fetch(s,{method:'post',body:JSON.stringify({op:'logout'})})}
+,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'post'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify({op:'chngPw',pw:btoa(pw),clientTime:clientTime})})
+,update	:(cat,id,path,lm,val)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'put'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify(val)})
+,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'patch'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify(meta)})
+,insert	:(cat,id,val)	=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'post'
+	,headers: {'Content-Type': 'application/json'}
+	,body:JSON.stringify(val)})
 ,byDates	:(from,to)		=>fetch(p.srvr.url+from+'/'+to)
 }//srvr
 

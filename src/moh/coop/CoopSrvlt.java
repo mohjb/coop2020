@@ -40,8 +40,8 @@ signup(@HttpMethod(prmName="cid") String cid
 
 @HttpMethod(usrLoginNeeded = false) public static Map
 login(@HttpMethod(prmUrlPart = true) String cid//prmName="cid"
-	,@HttpMethod (prmUrlPart = true)Date lm//prmName ="lm"
-	,@HttpMethod (prmUrlPart = true)Date ct //prmName="clientTime"
+	,@HttpMethod (prmName ="lm")Date lm
+	,@HttpMethod (prmName="clientTime")Date ct
 	, @HttpMethod(prmName="pw") String pw
 	, TL tl)throws Exception {
 	tl.log("CoopSrvlt.login:0:",cid,pw,lm,ct);
@@ -153,7 +153,7 @@ post(@HttpMethod(prmUrlPart = true )String cat // prmName="cat"
 	int typ="coop".equals(cat)?2:"usr".equals(cat)?1:0;
 	Prop t=typ==2?new Coop():typ==1?new User():Prop.tl();
 	t.cat=cat;t.id=id;
-	if(t.exists(t.wherePK(),null))
+	if(t.exists(t.wherePK(),t.getName()))
 		return null;
 
 	User.AccessLevel u=t.access(tl.usr.id);
@@ -203,16 +203,37 @@ public static class Prop extends Sql.Tbl {
 			)
 		);//val
 		/*
-		CREATE TABLE `Prop` (
-		`id`	int(36) not null primary key auto_increment
-		,`log`	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-		,`cat`	varchar(255) NOT NULL DEFAULT '??'
-		,`prop`	varchar(255) NOT NULL DEFAULT '??'
-		,`meta`	text
-		,`val`	text
-		,unique(`cat`,`prop`)
-		,unique(`log` )
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `prop` (
+	`log` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	`cat` varchar(255) NOT NULL DEFAULT '??',
+	`id` varchar(255) NOT NULL DEFAULT '??',
+	`meta` longtext,
+	`val` longtext,
+	PRIMARY KEY (`cat`,`id`),
+	KEY `log` (`log`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `log` (
+	`log` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	`cat` varchar(255) NOT NULL DEFAULT '??',
+	`id` varchar(255) NOT NULL DEFAULT '??',
+	`meta` longtext,
+	`val` longtext,
+	index (`cat`,`id`),
+	index (`log`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `Prop` (
+	`log`	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	,`cat`	varchar(255) NOT NULL DEFAULT '??'
+	,`id`	varchar(255) NOT NULL DEFAULT '??'
+	,`meta`	longtext
+	,`val`	longtext
+	,unique(`cat`,`prop`)
+	,unique(`log` )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE `Prop` (`id`	int(36) not null primary key auto_increment,`log`	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,`cat`	varchar(255) NOT NULL DEFAULT '??',`prop`	varchar(255) NOT NULL DEFAULT '??',`meta`	text,`val`	text,unique(`cat`,`prop`),unique(`log` )) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -299,7 +320,7 @@ PRIMARY KEY (`cat`,`id`,`log`)
 
 	public Map v()throws Exception{
 		if(val==null)
-			val=new HashMap();
+			return (Map)(val=new HashMap());
 		else if(val instanceof Map)
 			return (Map)val;
 		else try{
@@ -336,7 +357,7 @@ PRIMARY KEY (`cat`,`id`,`log`)
 
 	public Map m(){
 		if(meta==null)
-			meta=new HashMap();
+			return (Map) (meta=new HashMap());
 		else if(meta instanceof Map)
 			return (Map)meta;
 		else try{
@@ -355,13 +376,12 @@ PRIMARY KEY (`cat`,`id`,`log`)
 		String s=o==null?null:o.toString();
 		return s;}
 
-	public Object m(String n,Object x){return m(n,x,0);}
+	public Object m(String n,Object x){return m(n,x,false);}
 
-	public Object m(String n,Object x,int lvl){
+	public Object m(String n,Object x,boolean save){
 		m().put(n,x);
-		if(lvl>0)try{
-			if(lvl>1)
-				save();
+		if(save)try{
+			save();
 		}catch (Exception ex){}
 		return x;}
 
@@ -398,7 +418,7 @@ public static class Log extends Prop{
 
 	@Override public List DBTblCreation(TL t){
 		List x=super.DBTblCreation(t);
-		x.set(1,Util.lst("primary key(`"+C.cat+"`,`"+C.id+"`,`"+C.log+"`)"));
+		x.set(1,Util.lst(Util.lst(C.cat,C.id),Util.lst(C.log)));
 		return x;
 	}
 
@@ -451,7 +471,7 @@ public static class User extends Prop{
 
 	public boolean chngPw(String pw){
 		String x=Util.md5(pw);
-		m("pw",x,2);
+		m("pw",x,true);
 		return true;}
 
 	public boolean chngCoopId(String coopId){
