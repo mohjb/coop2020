@@ -980,8 +980,7 @@ public static class Json {
 
 		public Output oDt(java.util.Date a, String indentation) throws IOException {
 			if (a == null) return w(comment ? " null //Date\n" : "null");
-			//w("{\"class\":\"Date\",\"time\":0x").p(Long.toHexString( a.getTime()));//.w(",\"str\":").oStr(a.toString(),indentation);
-			w("0x").p(Long.toHexString(a.getTime()));//if(comment)w("}//Date\n").p(indentation);else w("}");
+			w("{\"time\":").p(a.getTime()).w("}");//w("0x").p(Long.toHexString(a.getTime()));//if(comment)w("}//Date\n").p(indentation);else w("}");
 			return this;
 		}
 
@@ -1103,7 +1102,7 @@ public static class Json {
 			if (e.hasNext()) {
 				k = e.next();
 				v = o.get(k);//if(o instanceof Store.JsonStorage)w(",");
-				o(k, ind, c ? path + k : path);
+				o(String.valueOf(k), ind, c ? path + k : path);
 				w(":");
 				o(v, ind, c ? path + k : path);
 			}
@@ -1111,7 +1110,7 @@ public static class Json {
 				k = e.next();
 				v = o.get(k);
 				w(",");
-				o(k, ind, c ? path + k : path);
+				o(String.valueOf(k), ind, c ? path + k : path);
 				w(":");
 				o(v, ind, c ? path + k : path);
 			}
@@ -1440,7 +1439,7 @@ public static class Json {
 		public static Object parse(Reader p) throws Exception {
 			if (p == null) return null;
 			Prsr j = new Prsr();
-			j.rdr = p;if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.parse(Reader):",p);
+			j.rdr = p;//if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.parse(Reader):",p);
 			j.nxt(j.c = j.read());
 			return j.parse();
 		}//public static Object parseItem(Reader p)throws Exception{ Prsr j=new Prsr();j.rdr=p;j.nxt(j.c=j.read());return j.parseItem();}
@@ -1771,8 +1770,7 @@ public static class Json {
 		char read() {
 			int h = -1;
 			try {
-				h = rdr.read();
-				if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.read:(",_row,",",_col,"):",h,":",(char)h);
+				h = rdr.read();//if(TL.tl().h.logDbg)TL.tl().log("Json.Prsr.read:(",_row,",",_col,"):",h,":",(char)h);
 			} catch (Exception ex) {
 				TL.tl().error(ex, "TL.Json.Prsr.read");
 			}

@@ -42,13 +42,18 @@ signup(@HttpMethod(prmName="cid") String cid
 login(@HttpMethod(prmUrlPart = true) String cid//prmName="cid"
 	,@HttpMethod (prmName ="lm")Date lm
 	,@HttpMethod (prmName="clientTime")Date ct
+	,@HttpMethod (prmName="expire")Long expire
 	, @HttpMethod(prmName="pw") String pw
 	, TL tl)throws Exception {
 	tl.log("CoopSrvlt.login:0:",cid,pw,lm,ct);
 	User u=User.load (cid);
 	String md5=pw != null?Util.md5(Util.b64d(pw)):pw,upw=u.pw();
-	if(u != null && upw!=null && upw.equals(md5)) {
-		tl.h.s("cid",cid);
+	if(u != null
+	  &&( (upw!=null && upw.equals(md5) )
+		 ||
+		  ( expire!=null && expire.equals( u.vo("expire") ))
+		)
+	 ){	tl.h.s("cid",cid);
 		tl.h.s("usr",tl.usr=u);
 		u.v("login",tl.now);
 		u.v("session",ct,true); //m.put("return",tl.now);

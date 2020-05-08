@@ -53,10 +53,12 @@ function mainCtrlController($scope,$rootScope ) {
 		for(var cat in d[7]){d[8]=d[7][cat]
 		for(var id in d[8]){o=d[8][id]
 			x=new Date(y,mnth,dy,hr,mn,sc,ms).getTime() // 
-			if(p.usrls.srvrLM<x){p.usrls.srvrLM=x;}
+			if((!p.usrls.srvrLM)||(p.usrls.srvrLM<x)){p.usrls.srvrLM=x;}
 			p.saveLSProp(cat,id,o)
 			p.onSrvrChng(cat,id,o)
-	}}}}}}}}}}
+	}}}}}}}}}
+	p.usrls.clientTime=now()
+	}
 
 	p.onSrvrChng=function(cat,id,prop){
 		p.fireLstnrs(cat,id,prop)}
@@ -74,7 +76,7 @@ function mainCtrlController($scope,$rootScope ) {
 			o=localStorage[k]
 			o=JSON.parse(o)
 			c[id]=o;
-			if(log<o.log)
+			if(o && log<o.log)
 				log=o.log;
 		 }
 		}}return {ls:ls,log:log};
@@ -98,7 +100,7 @@ function mainCtrlController($scope,$rootScope ) {
 		localStorage.coop1Usr=JSON.stringify(p.usrls);}
 
 p.srvr={
-url:'http://localhost:8080/CoopSrvlt/'
+url:'/CoopSrvlt/'
 ,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'post'
 	,headers: {'Content-Type': 'application/json'}
 	,body:JSON.stringify({op:'signup',cid:cid,pw:btoa(pw),val:val})})
@@ -124,21 +126,64 @@ url:'http://localhost:8080/CoopSrvlt/'
 ,byDates	:(from,to)		=>fetch(p.srvr.url+from+'/'+to)
 }//srvr
 
+	p.poll={intrvl:0,period:1000*20
+		,init:function(){
+			var o=p.poll,f
+			if(o.intrvl)return;
+			f=[
+					p.srvr.byDates
+				,
+					r=>r.json()
+				,
+					r=>p.onByDate(r.return)
+				,
+					()=>{var n=now()
+					if(n>=o.trgt){o.trgt=n+o.period
+						f[0](p.usrls.srvrLM,n)
+						.then(f[1])
+						.then(f[2]);}
+					o.remaining=((o.trgt-n)/1000).toFixed(0)
+					p.$digest();
+					}
+			]
+			o.trgt=now()+o.period
+			o.intrvl=setInterval(f[3],1000)
+		}
+		,stop:function(){
+			if(p.poll.intrvl){clearInterval(p.poll.intrvl);p.poll.intrvl=0;}}
+		,setPeriod:function(v){p.poll.stop();p.poll.period=v;p.poll.init();}
+	}
+
 	p.usrLogin=()=>{
 		var n=p.inp,dt=now();
 		console.log('usrLogin',n,dt);
 		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt)
 		.then(r=>r.json())
-		.then(r=>{
+		.then(r=>{r=r&&r['return']
 			if(r)
-			{	p.usrls.val=p.usr=r.val;
+			{	p.usr=r.val;if(!p.usr.pollPeriod)p.usr.pollPeriod=1000*20
+				p.usrls.login=dt;
+				p.usrls.cid=p.usr.id;
+				p.usrls.expire=p.usr.expire
 				p.onByDate(r.byDates)
 				p.screen='consumer'
 				console.log('usrLogin:response',r);
+				p.poll.init()
 				return p.saveLSUsr()}
 			else
 				alert('invalid login');
 			})
+		/*
+			Non
+            ,SignupPending
+            ,ProfilePending
+            ,Ready  //  ,Loggedout
+            ,QueuePending
+            ,Queued
+            ,Auth2enter
+            ,InCoop
+            ,QuotaPending
+		*/
 	}//clkLogin
 
 	p.usrLogin.init=function(sv){
@@ -148,7 +193,8 @@ url:'http://localhost:8080/CoopSrvlt/'
 		else{
 			p.usrls={usrId:p.newId(),coopId:0,srvrLM:0} // p.usrls.cid=p.usrls.usrId;
 			if(sv)p.saveLSUsr();}
-		p.screen='consumer'
+		p.screen='consumer';p.poll.init()
+		if(!p.inp)p.inp={};p.inp.cid=p.usrls.id
 	}
 
 	p.loadLSProps()
@@ -156,6 +202,47 @@ url:'http://localhost:8080/CoopSrvlt/'
 
 	p.lstnrs={}//cat/id/{o:<obj:lstnr>,mthdNm:<str:mthdNm ,in lstnr>}
 	p.inp={}
+
+	p.generateDay=function(dt){}
+
+	p.getAppointments=function(dt){}
+	p.chngDt=function(){}
+
+ p.generateDayAppointments=function(t){
+	if(!p.coop)return;
+	var c=p.coop,a=[]
+	,wha=c.workingHours||[[new Date(0,0,0,7,30),new Date(0,0,0,15,30)]]
+	,st=c.noPeoplePerTimeSlot||1 // simultanious people in the same time slot
+	,period=c.timeSlotPeriod||30*60*1000
+	,d,dt,x,wh
+	for(var ai in wha){
+		wh=wha[ai]
+		d=new Date(t.getFullYear(),t.getMonth(),t.getDate()
+			,wh[0].getHours(),wh[0].getMinutes() )
+		dt=d.getTime()
+		x=new Date(t.getFullYear(),t.getMonth(),t.getDate()
+			,wh[1].getHours(),wh[1].getMinutes() ).getTime()
+		a.push({id:dt,t:d})
+		d=new Date(dt+period);dt=d.getTime()
+		while(dt <= x){
+			a.push({id:dt,t:d})
+			d=new Date(dt+period);dt=d.getTime();
+		}
+	}
+	return a;
+ }
+
+	//p.dateToArray=function(x){x=[x.getFullYear(),x.getMonth()+1,x.getDay(),x.getHours(),x.getMinutes(),x.getSeconds(),x.getMilliseconds(),x];return x;};p.d2Arr=function(x){x=[x.getHours(),x.getMinutes(),x];return x;}
+	p.radioTime=function(apt){
+		var u=p.usr,s='appointment',x=u[s]
+		if(x)x.cid=null;
+		u[s]=apt;apt.cid=u.id;
+		console.log('radioTime:',apt)
+		}
+
+	p.tm2s=function tm2s(t){return t.getHours()+':'+('00'+t.getMinutes()).slice(-2);}
+	p.inp.apptDay=new Date()
+	p.appointmentsTable=p.generateDayAppointments( p.inp.apptDay )
 
 	console.log('controller:MainCntrl: app=',app,' ,scope=',p )
 }
@@ -165,14 +252,15 @@ url:'http://localhost:8080/CoopSrvlt/'
 <h1>Coop Appointments</h1>
 
 <fieldset><legend>login</legend>
-    <form id=frmLogin><table border=1>
-        <tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
-        <tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
-    </table><input type="button" ng-click="usrLogin()" value="Login" /></form>
-    <div id=loginInfo></div>
+	<form id=frmLogin><table border=1>
+		<tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
+		<tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
+	</table><input type="button" ng-click="usrLogin()" value="Login" /></form>
+	<span style="border:1px solid black">state={{usr.state}} , pollRemaining={{poll.remaining}} , srvrLM={{usrls.srvrLM}} , clientTime={{usrls.clientTime}}</span>
+	<div id=loginInfo></div>
 </fieldset>
 
-<fieldset><legend>logout</legend>
+<!-- fieldset><legend>logout</legend>
 </fieldset>
 
 <fieldset><legend>signup</legend>
@@ -191,7 +279,25 @@ url:'http://localhost:8080/CoopSrvlt/'
 </fieldset>
 
 <fieldset><legend>updateMeta</legend>
-</fieldset>
+</fieldset -->
+
+<fieldset ng-if="usr.state"><legend>consumer.state:{{usr.state}}</legend>
+	<!--div ng-if="usr.state=='Non'">Non</div-->
+	<div ng-if="usr.state=='SignupPending'">SignupPending</div>
+	<div ng-if="usr.state=='ProfilePending'">ProfilePending</div>
+	<div ng-if="usr.state=='Ready'">Ready
+		<input type="date" ng-model="inp.apptDay" ng-change="chngDt()"/>
+		<span ng-repeat="x in appointmentsTable" ><br/>
+			<input type="radio" ng-value="x.id" id="{{x.id}}"
+				ng-model="inp.apptTime"
+			/><label for="{{x.id}}">{{tm2s(x.t)}}</label></span>
+	inp={{inp|json}}
+	</div>
+	<div ng-if="usr.state=='QueuePending'">QueuePending</div>
+	<div ng-if="usr.state=='Queued'">Queued</div>
+	<div ng-if="usr.state=='Auth2enter'">Auth2enter</div>
+	<div ng-if="usr.state=='InCoop'">InCoop</div>
+	<div ng-if="usr.state=='QuotaPending'">QuotaPending</div></fieldset>
 
 <br/>mbohamad@kisr.edu.kw
 </body>
