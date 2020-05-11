@@ -6,16 +6,13 @@
 now=()=>(new Date()).getTime();
 
 did=p=>document.getElementById(p);
-//String.prototype.startsWith=s=>this.substr(s.length)=s
+dbg=true;//String.prototype.startsWith=s=>this.substr(s.length)=s
 
 app.controller('MainCtrl',['$scope',
 function mainCtrlController($scope,$rootScope ) {
 	var p=app.p=$scope ;p.app=app;
-
 	p.newId=function(){return now();}
-
 	p.sessionStart=new Date();
-
 	p.addLstnr=function(cat,id,o,mthdNm){
 		var x=p.lstnrs[cat],y
 		if(!x)
@@ -70,7 +67,7 @@ function mainCtrlController($scope,$rootScope ) {
 		 if(ks.substr(0,6)=='coop1|')
 		{b=ks.split('|')
 		 if(b.length==3){
-			cat=b[1];id=b[1];
+			cat=b[1];id=b[2];
 			if(!(c=ls[cat]))
 				c=ls[cat]={}
 			o=localStorage[k]
@@ -89,41 +86,48 @@ function mainCtrlController($scope,$rootScope ) {
 			p.saveLSProp(cat,id,o)
 		}}}
 
-//prop::= log,cat,id,meta,val
+	//prop::= log,cat,id,meta,val
 	p.saveLSProp=function(cat,id,prop){
 		var k='coop1|'+cat+'|'+id
 		,s=JSON.stringify(prop);
 		localStorage[k]=s;
 		console.log('saveLSProp:',k,s);
 		return s;}
+
 	p.saveLSUsr=function(){
 		localStorage.coop1Usr=JSON.stringify(p.usrls);}
 
 p.srvr={
 url:'/CoopSrvlt/'
-,signup	:(cid,pw,val)	=>fetch(p.srvr.url,{method:'post'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify({op:'signup',cid:cid,pw:btoa(pw),val:val})})
+,f:(body,url,mthd)=>fetch(p.srvr.url+(url?url:'')
+	,	{method:mthd||'post'
+		,headers: {'Content-Type': 'application/json'}
+		,body:JSON.stringify(body)}
+	)
+,signup	:(usrId,pw,val)	=>p.srvr.f({op:'signup',usrId:usrId,pw:btoa(pw),val:val})
 ,login	:(cid,pw,lm,clientTime)=>{
-	var s=p.srvr.url+cid;
-	console.log('srvr.login:',lm,s);
-	return fetch(s,{method:'post'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify({op:'login',pw:btoa(pw),lm:lm,clientTime:clientTime})})}
-,logout	:()=>{var s=p.srvr.url;console.log('srvr.logout:',s);return fetch(s,{method:'post',body:JSON.stringify({op:'logout'})})}
-,chngPw	:(pw,clientTime)	=>fetch(p.srvr.url,{method:'post'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify({op:'chngPw',pw:btoa(pw),clientTime:clientTime})})
-,update	:(cat,id,path,lm,val)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'put'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify(val)})
-,updateMeta:(cat,id,path,meta)=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'patch'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify(meta)})
-,insert	:(cat,id,val)	=>fetch(p.srvr.url+cat+'/'+id+'/'+path,{method:'post'
+	console.log('srvr.login:',lm,cid);
+	return p.srvr.f({op:'login',pw:btoa(pw),lm:lm,clientTime:clientTime})}
+,logout	:()=>{console.log('srvr.logout:');return p.srvr.f({op:'logout'})}
+,chngPw	:(pw,clientTime)	=>p.srvr.f({op:'chngPw',pw:btoa(pw),clientTime:clientTime})
+,update	:(cat,id,path,lm,val)=>p.srvr.f(val,cat+'/'+id+'/'+path,'put')
+,updateMeta:(cat,id,path,meta)=>p.srvr.f(meta,cat+'/'+id+'/'+path,'patch')
+,insert	:(cat,id,val)	=>p.srvr.f(p.srvr.url+cat+'/'+id+'/'+path,{method:'post'
 	,headers: {'Content-Type': 'application/json'}
 	,body:JSON.stringify(val)})
 ,byDates	:(from,to)		=>fetch(p.srvr.url+from+'/'+to)
+	,UserState:{
+		Non:{i:0,s:'Non'}
+		,SignupPending:{i:1,s:'SignupPending'}
+		,ProfilePending:{i:2,s:'ProfilePending'}
+		,Ready:{i:3,s:'Ready'}
+		,QueuePending:{i:4,s:'QueuePending'}
+		,Queued:{i:5,s:'Queued'}
+		,Auth2enter:{i:6,s:'Auth2enter'}
+		,InCoop:{i:7,s:'InCoop'}
+		,QuotaPending:{i:8,s:'QuotaPending'}
+		,valueOf:s=>Object.keys(p.srvr.UserState).filter(e=>e==s)[0]
+	}
 }//srvr
 
 	p.poll={intrvl:0,period:1000*20
@@ -131,20 +135,20 @@ url:'/CoopSrvlt/'
 			var o=p.poll,f
 			if(o.intrvl)return;
 			f=[
-					p.srvr.byDates
-				,
-					r=>r.json()
-				,
-					r=>p.onByDate(r.return)
-				,
-					()=>{var n=now()
+				p.srvr.byDates
+			  ,
+				r=>r.json()
+			  ,
+				r=>r?p.onByDate(r['return']):{}
+			  ,
+				()=>{var n=now()
 					if(n>=o.trgt){o.trgt=n+o.period
 						f[0](p.usrls.srvrLM,n)
 						.then(f[1])
 						.then(f[2]);}
 					o.remaining=((o.trgt-n)/1000).toFixed(0)
 					p.$digest();
-					}
+				}
 			]
 			o.trgt=now()+o.period
 			o.intrvl=setInterval(f[3],1000)
@@ -159,56 +163,63 @@ url:'/CoopSrvlt/'
 		console.log('usrLogin',n,dt);
 		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt)
 		.then(r=>r.json())
-		.then(r=>{r=r&&r['return']
-			if(r)
-			{	p.usr=r.val;if(!p.usr.pollPeriod)p.usr.pollPeriod=1000*20
-				p.usrls.login=dt;
-				p.usrls.cid=p.usr.id;
-				p.usrls.expire=p.usr.expire
-				p.onByDate(r.byDates)
-				p.screen='consumer'
+		.then(r=>{r=r&&r['return'];if(r)
+			{	p.usr=r.val;
+				try{	p.usr.state=  p.srvr.UserState.valueOf(
+					p.usr.state)||p.srvr.UserState.Non;
+				}catch(ex){}
+				p.usrLogin.init(true,r.byDates)
 				console.log('usrLogin:response',r);
-				p.poll.init()
-				return p.saveLSUsr()}
+				return p.saveLSUsr();}
 			else
 				alert('invalid login');
 			})
-		/*
-			Non
-            ,SignupPending
-            ,ProfilePending
-            ,Ready  //  ,Loggedout
-            ,QueuePending
-            ,Queued
-            ,Auth2enter
-            ,InCoop
-            ,QuotaPending
-		*/
 	}//clkLogin
 
-	p.usrLogin.init=function(sv){
-		var x=localStorage.coop1Usr
-		if(x)
+	p.usrLogin.init=function(sv,byDts){
+		var x=!sv && localStorage.coop1Usr,US=p.srvr.UserState,newUsr=0
+		if(x && !sv)
 			p.usrls=JSON.parse(x);
-		else{
-			p.usrls={usrId:p.newId(),coopId:0,srvrLM:0} // p.usrls.cid=p.usrls.usrId;
-			if(sv)p.saveLSUsr();}
-		p.screen='consumer';p.poll.init()
-		if(!p.inp)p.inp={};p.inp.cid=p.usrls.id
+		else newUsr=p.usrls=
+			{usrId:sv=p.newId(),coopId:0,srvrLM:0}
+		p.screen='consumer';
+		if(!p.usrls.pollPeriod)
+			p.usrls.pollPeriod=1000*20
+		if(dbg && p.usr.state&& p.usr.state.i<US.Ready.i)
+			p.usr.state=US.Ready;
+		else p.usr.state=US.valueOf(
+			p.usr.state)||US.Non;
+		p.usrls.state=p.usr.state.s|| US[
+			dbg?'Ready':'Non'
+			].s;
+		p.usrls.login=dt;
+		p.usrls.cid=p.usr.id;
+		p.usrls.expire=p.usr.expire
+		if(byDts)
+			p.onByDate(byDts)
+		if(sv)
+			p.saveLSUsr()
+		p.inp.cid=p.usrls.id || p.usrls.usrId
+		if(newUsr)
+			p.srvr.signup(p.inp.cid,p.inp.pw,newUsr)
+		p.screen='consumer'
+		p.poll.init()
 	}
 
-	p.loadLSProps()
+	x=p.loadLSProps()
+	p.ls=x.ls;p.lslm=x.log;
+	p.inp={}
 	p.usrLogin.init()
 
 	p.lstnrs={}//cat/id/{o:<obj:lstnr>,mthdNm:<str:mthdNm ,in lstnr>}
-	p.inp={}
-
+	
 	p.generateDay=function(dt){}
 
 	p.getAppointments=function(dt){}
 	p.chngDt=function(){}
 
  p.generateDayAppointments=function(t){
+	if(dbg && !p.coop)p.coop={id:1,cat:'coop'}
 	if(!p.coop)return;
 	var c=p.coop,a=[]
 	,wha=c.workingHours||[[new Date(0,0,0,7,30),new Date(0,0,0,15,30)]]
@@ -238,7 +249,7 @@ url:'/CoopSrvlt/'
 		if(x)x.cid=null;
 		u[s]=apt;apt.cid=u.id;
 		console.log('radioTime:',apt)
-		}
+	}
 
 	p.tm2s=function tm2s(t){return t.getHours()+':'+('00'+t.getMinutes()).slice(-2);}
 	p.inp.apptDay=new Date()
@@ -251,14 +262,18 @@ url:'/CoopSrvlt/'
 </script>
 <h1>Coop Appointments</h1>
 
-<fieldset><legend>login</legend>
+<fieldset ng-if="!usr.state"><legend>login</legend>
 	<form id=frmLogin><table border=1>
 		<tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
 		<tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
 	</table><input type="button" ng-click="usrLogin()" value="Login" /></form>
-	<span style="border:1px solid black">state={{usr.state}} , pollRemaining={{poll.remaining}} , srvrLM={{usrls.srvrLM}} , clientTime={{usrls.clientTime}}</span>
 	<div id=loginInfo></div>
 </fieldset>
+
+<span style="border:1px solid black">state={{usr.state}} 
+	, pollRemaining={{poll.remaining}} 
+	, srvrLM={{usrls.srvrLM}} 
+	, clientTime={{usrls.clientTime}}</span>
 
 <!-- fieldset><legend>logout</legend>
 </fieldset>
@@ -283,9 +298,9 @@ url:'/CoopSrvlt/'
 
 <fieldset ng-if="usr.state"><legend>consumer.state:{{usr.state}}</legend>
 	<!--div ng-if="usr.state=='Non'">Non</div-->
-	<div ng-if="usr.state=='SignupPending'">SignupPending</div>
-	<div ng-if="usr.state=='ProfilePending'">ProfilePending</div>
-	<div ng-if="usr.state=='Ready'">Ready
+	<div ng-if="usr.state.s=='SignupPending'">SignupPending</div>
+	<div ng-if="usr.state.s=='ProfilePending'">ProfilePending</div>
+	<div ng-if="usr.state.s=='Ready'">Ready
 		<input type="date" ng-model="inp.apptDay" ng-change="chngDt()"/>
 		<span ng-repeat="x in appointmentsTable" ><br/>
 			<input type="radio" ng-value="x.id" id="{{x.id}}"
@@ -293,11 +308,22 @@ url:'/CoopSrvlt/'
 			/><label for="{{x.id}}">{{tm2s(x.t)}}</label></span>
 	inp={{inp|json}}
 	</div>
-	<div ng-if="usr.state=='QueuePending'">QueuePending</div>
-	<div ng-if="usr.state=='Queued'">Queued</div>
-	<div ng-if="usr.state=='Auth2enter'">Auth2enter</div>
-	<div ng-if="usr.state=='InCoop'">InCoop</div>
-	<div ng-if="usr.state=='QuotaPending'">QuotaPending</div></fieldset>
+	<div ng-if="usr.state.s=='QueuePending'">QueuePending</div>
+	<div ng-if="usr.state.s=='Queued'">Queued</div>
+	<div ng-if="usr.state.s=='Auth2enter'">Auth2enter</div>
+	<div ng-if="usr.state.s=='InCoop'">InCoop</div>
+	<div ng-if="usr.state.s=='QuotaPending'">QuotaPending</div></fieldset>
+
+<!-- fieldset ng-if="">
+<legend>Coop:{{ coop.label }}</legend>
+coop.noPeoplePerTimeSlot || 
+coop.workingHours [ [date,date] ...]
+timeSlotPeriod || 30*60*1000
+appointmentsTable:{
+	<long:time>:[ {id:<long> , d:<date> ,cid:<str:usr.id> } ...]
+}
+
+</fieldset -->
 
 <br/>mbohamad@kisr.edu.kw
 </body>
