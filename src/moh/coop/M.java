@@ -3,7 +3,8 @@ package moh.coop;
 /**
  * Created by mohamadjb@gmail.com on 16/4/20.
  */
-import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
+import com.mysql.cj.jdbc.MysqlConnectionPoolDataSource;//import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
+
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
@@ -16,6 +17,7 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.sql.ConnectionPoolDataSource;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -804,6 +806,14 @@ public static class Util{ //utility methods
 			, g.get( Calendar.SECOND )
 			, g.get( Calendar.MILLISECOND )};
 		return a;}
+
+	/* static Object call(Object o,String methodName,Object prm)throws Exception{
+		Class c=o instanceof Class?(Class)o:o==null?null:o.getClass();
+		if(c==null)return null;
+		Method m=c.getMethod(methodName);
+		return m==null?null:m.invoke(o,prm);}
+	*/
+
 }//class Util
 
 //////////////////////////////////////////////////////////////////////
@@ -1902,7 +1912,7 @@ public static class Json {
 //////////////////////////////////////////////////////////////////////
 
 public static class Sql {
-	static MysqlConnectionPoolDataSource pool;
+	static ConnectionPoolDataSource pool;//MysqlConnectionPoolDataSource pool;
 	/**returns a jdbc pooled Connection.
 	 uses MysqlConnectionPoolDataSource with a database from the enum context.Sql.url.str,
 	 sets the pool as an application-scope attribute named context.Sql.pool.str
@@ -1960,7 +1970,8 @@ public static class Sql {
 		MysqlConnectionPoolDataSource d=new MysqlConnectionPoolDataSource();
 		String ss=null,s=context.DB.dbName.a[Math.min(context.DB.dbName.a.length-1,idb)];
 		if(t.h.logOut)ss="\ndb:"+s;
-		d.setDatabaseName(s);d.setPort(3306);
+		d.setDatabaseName(s);
+		d.setPort(3306);
 		s=context.DB.server.a[Math.min(context.DB.server.a.length-1,isr)];
 		if(t.h.logOut)ss+="\nsrvr:"+s;
 		d.setServerName(s);

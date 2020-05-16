@@ -887,10 +887,15 @@ public static class SrvltContxt implements ServletContext{//static SrvltContxt s
 	@Override public ServletRegistration.Dynamic addServlet(String arg0, String p2){return null;}
 	@Override public ServletRegistration.Dynamic addServlet(String arg0, Servlet p2){return null;}
 	@Override public ServletRegistration.Dynamic addServlet(String arg0, Class<? extends Servlet> p2){return null;}
+
+	@Override public ServletRegistration.Dynamic addJspFile(String s, String s1) {return null; }//added 2020-05-13
+
 	@Override public <T extends Filter> T createFilter(Class<T> p2)throws ServletException{return null;}
 	@Override public <T extends EventListener> T createListener(Class<T> p2)throws ServletException{return null;}
 	@Override public <T extends Servlet> T createServlet(Class<T> p2)throws ServletException{return null;}
 	@Override public void declareRoles(String... p){}
+
+
 	@Override public Object getAttribute(String p){return attribs.get(p);}
 	@Override public Enumeration<String> getAttributeNames(){return new Enumeration<String>() {
 		Iterator<String>i=attribs.keySet().iterator();
@@ -959,6 +964,37 @@ public static class SrvltContxt implements ServletContext{//static SrvltContxt s
 	@Override public Enumeration<Servlet> getServlets(){return null;}
 	@Override public SessionCookieConfig getSessionCookieConfig(){return null;}
 	@Override public String getVirtualServerName(){return null;}
+
+	@Override
+	public int getSessionTimeout() {
+		return 0;
+	}
+
+	@Override
+	public void setSessionTimeout(int i) {
+
+	}
+
+	@Override
+	public String getRequestCharacterEncoding() {
+		return null;
+	}
+
+	@Override
+	public void setRequestCharacterEncoding(String s) {
+
+	}
+
+	@Override
+	public String getResponseCharacterEncoding() {
+		return null;
+	}
+
+	@Override
+	public void setResponseCharacterEncoding(String s) {
+
+	}
+
 	@Override public void log(String p){p("log:",p);}
 	@Override public void log(Exception x, String p){x.printStackTrace();p(p);}
 	@Override public void log(String p, Throwable x){log(p);x.printStackTrace();}
