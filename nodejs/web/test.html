@@ -1,0 +1,66 @@
+<script>function hash(p){
+	if(!p)return '';
+	let r=[],n=hash.n,b=hash.b,a=hash.a
+	,pn=p.length,c=p.charCodeAt(0),d=c%62
+	if(!n){n=hash.n=24;b=hash.b=[]
+		let u=[['0','9'],['A','Z'],['a','z']]
+		for(var j=0;j<u.length;j++){
+			var x=u[j]
+			,c0=x[0].charCodeAt(0)
+			,c1=x[1].charCodeAt(0)
+			for(var k=c0;k<=c1;k++)
+				b.push(k);}
+		b.push('$'.charCodeAt(0),'_'.charCodeAt(0));
+		let bitRotate=hash.bitRotate=(byte,i)=>{
+			if(!i)i=1;
+			let a=((byte&255) << i )  &255
+				, b = ((byte&255) >>(8-i))&255
+				,r=a|b
+				return r;}
+		,bitSwapNibbles=(byte)=>{
+			let a=((byte&15)<<4) 
+			,b= ((byte&255) >>4)&15
+			,r=a|b
+			return r;}
+		,bitSwapEvenOdd=(byte)=>{
+			let a=((byte&0x33)<<1) &255	// 0101 0101
+			,b = ( (byte&0x66)>>1) &255	// 1010 1010
+			,r=a|b
+			return r;}
+		,bitReverse=(byte)=>{
+			let r=0;
+			for(let i=0;i<8;i++)
+			  if(byte&(128>>i))
+				r=r|(1<<i)
+			return r;}
+		a=hash.a=[bitReverse,bitSwapEvenOdd,bitSwapNibbles]
+	}
+	for(var j=0;j<n;j++)r[j]=d;
+
+
+	function propagate(c,i){
+		propgt=(x,i)=>{
+		  for(let j=i;j<i+n;j++){
+		  	let i1=j%n,v1=r[i1],v2=x++,v3=v1+v2
+		  		,v4=v3%64;
+			if(!r.includes(v4))r[i1]=v4;}}
+
+		let c2,j=8,g=-1;
+		for(let i0=i;i0<i+n;i0++){
+			if(++j>7){j=0;
+				c2=a[++g%a.length](c);}
+			else c2=hash.bitRotate(c2)
+			if(i0==i+n-1)
+				i0=i0 +0;
+			propgt(c2,i0)
+		}
+	}
+
+
+	for(var i=0;i<p.length;i++)
+		propagate(p.charCodeAt(i),i);
+
+	for(var j=0;j<n;j++)r[j]=String.fromCharCode( b[r[j] ] );
+	return r.join('');
+} // function hash
+</script><input type="button" value="test hash function" onclick="alert(hash(prompt()))"/>
