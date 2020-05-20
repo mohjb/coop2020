@@ -103,9 +103,9 @@ String.prototype.hash=function hash(p){
 } // function hash
 /////////////////////////////////
 
-db={db:{},log:{bounds:[0,0]},session:{}
+db={db:{},logCache:{bounds:[0,0]},session:{}
 
-,init:()=>{let log=db.log.bounds;
+,init:()=>{let log=db.logCache.bounds;
 	function f(pathArr){
 		function fil(pth,obj,prop){
 			fs.promises.readFile(pth,'utf-8').
@@ -158,8 +158,8 @@ db={db:{},log:{bounds:[0,0]},session:{}
 			{parent:g[i-1],key:da[i],t:Date
 				.fromArray(da,i).getTime()}
 			if(i==0){
-				db.log[da[0]]=g[0];
-				g[0].parent=db.log}
+				db.logCache[da[0]]=g[0];
+				g[0].parent=db.logCache}
 			}
 		i++;}
 	g=g[g.length-1]
@@ -174,9 +174,9 @@ db={db:{},log:{bounds:[0,0]},session:{}
 	g.prop=prop;
 	g.da=da;g.t=lm;
 	if(obj.propLog[prop])
-		rem(g);
+		rem(obj.propLog[prop]);//g
 	obj.propLog[prop]=g
-	let log=db.log.bounds;
+	let log=db.logCache.bounds;
 	//if(log[0]==g){log[0]=null;}		// TODO: if log[0] is relocated , must find the next minimum ; if(!log[0] || log[0].t>lm) log[0]=g;
 	//if(log[1]==g){}		// T-O-D-O: if log[1] is relocated, must find the previous maximum
 	if(!log[1] || log[1].t<lm)
@@ -198,7 +198,7 @@ db={db:{},log:{bounds:[0,0]},session:{}
 			}
 		}
 	}
-	f(db.log,[],0)
+	f(db.logCache,[],0)
 	return o;
 	}
 
@@ -206,7 +206,6 @@ db={db:{},log:{bounds:[0,0]},session:{}
 	fs.promises.mkdir('./db/prop/'+obj.cat+'/'+obj.id,{recursive:true}).then(()=>
 		fs.promises.writeFile('./db/prop/'+obj.cat+'/'+obj.id+'/'+(prop==null?'.obj':fnm)
 		, JSON.stringify(prop==null?obj.val:prop=='meta'?obj.meta: obj.val[prop])))
-//,load:(path,obj,prop,dirdate)=>fs.promises.readFile('./db/prop/'+path+'/'+prop,'utf-8').then(x=>obj[prop]=JSON.parse(x))
 
 ,access:(cid,cat,id)=>{//returnValue::= 0:no-access , 1:read-only , 2:write , 3:admin , 4:access
 	let r=0,d=db.db,a=[d[cat]],m
@@ -271,7 +270,7 @@ app.get('/poll/:dt',(req,resp,next)=>{
 	}
 })
 
-app.get('/login/',(req,resp,next)=>{
+app.put('/login/',(req,resp,next)=>{
 	console.log('get/login:',req,resp,next);
 	try{let b=req.body,uid=b.usrId,pw=b64d(b.pw).hash(),exp=b.expire
 		, u=db.db.usr[uid]
@@ -357,25 +356,4 @@ app.listen(process.env.PORT || 1024,()=>{
 	db.init()
 });
 
-
-console.log('indexJs : ',express,app);
-
-/*
-
-const mysql=require('mysql');
-const pool= mysql.createPool({ password:'m',user:'moh',database:'coop'}); 
-md5=async function(s){
-	let f=x=>{pool.query('select md5(?) as r',x
-		,(err,result)=>{
-		rv=err||result;
-	console.log('md5',rv);
-		return rv;
-	})}
-	let r=await f(s)
-	return r;
-}
-
-https://nodejs.org/api/crypto.html#crypto_crypto
-
-*/
-
+//console.log('indexJs : ',express,app);
