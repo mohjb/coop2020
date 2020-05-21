@@ -34,9 +34,7 @@ Date.prototype.toArray=function DateToArray(){
 const express=require('express');
 const app=express();
 const fs=require('fs');
-//const crypto = require('crypto');
 
-///////////////////////////////
 String.prototype.hash=function hash(p){
 	if(!p)p=this;//return '';
 	let r=[],n=hash.n,b=hash.b,a=hash.a
@@ -101,13 +99,12 @@ String.prototype.hash=function hash(p){
 	for(var j=0;j<n;j++)r[j]=String.fromCharCode( b[r[j] ] );
 	return r.join('');
 } // function hash
-/////////////////////////////////
 
-db={db:{},logCache:{bounds:[0,0]},session:{}
+db={ram:{prop:{},log:{bounds:[0,0]},session:{}}
 
-,init:()=>{let log=db.logCache.bounds;
+,init:()=>{//let log=db.ram.log.bounds;
 	function f(pathArr){
-		function fil(pth,obj,prop){
+		function fileClosure(pth,obj,prop){
 			fs.promises.readFile(pth,'utf-8').
 			then(x=>{if(prop=='meta')
 				obj.meta=JSON.parse(x)
@@ -117,8 +114,7 @@ db={db:{},logCache:{bounds:[0,0]},session:{}
 			})
 		}
 		fs.promises.readdir(pathArr.join('/'),{withFileTypes:true}).then(a=>{
-			for (var i=0;i<a.length;i++) {
-				//console.log(file);
+			for (var i=0;i<a.length;i++) {//console.log(a);
 				let x=a[i]
 				if(x.isDirectory())
 					f(pathArr.concat(x.name))
@@ -126,62 +122,18 @@ db={db:{},logCache:{bounds:[0,0]},session:{}
 					,catId=pathArr[n-3]
 					,id=pathArr[n-2]
 					,prop=pathArr[n-1]
-					,cat=db.db[catId],obj,pth;
-					if(!cat)cat=db.db[catId]={}
-					pth=pathArr.concat(x.name).join('/');
-					obj=cat[id];if(!obj)
-						obj=cat[id]={cat:catId,id:id,log:0,meta:{},val:{},propLog:{}}
-					fil(pth,obj,prop);
+					,cat=db.ram.prop[catId]||(db.ram.prop[catId]={})
+					,obj=cat[id]||(cat[id]={cat:catId,id:id
+						,log:0,meta:{},val:{},propLog:{}})
+					,pth=pathArr.concat(x.name).join('/');
+					fileClosure(pth,obj,prop);
 				}
 			}
 		})
 	}
 	f(['.','db','prop']);
 }
-,loglog:(obj,prop,da,lm)=>{
-	function rem(g){
-		let p=g.parent;
-		if(!p)return;
-		delete p[g.key];
-		let k=Object.keys(p)
-		if(k.length<=3)
-			rem(p);}
-	if(!da)da=new Date(lm||obj.log).toArray();
-	if(!lm)lm=obj.log;else
-	if(obj.log<lm)obj.log=lm;
-	if(obj.propLog[prop])
-		rem(obj.propLog[prop])//delete obj.propLog[prop];
-	let g=[],i=0
-	while(i<da.length){
-		g[i]=(i==0?db.log:g[i-i])[da[i]]
-		if(!g[i]){g[i]=
-			{parent:g[i-1],key:da[i],t:Date
-				.fromArray(da,i).getTime()}
-			if(i==0){
-				db.logCache[da[0]]=g[0];
-				g[0].parent=db.logCache}
-			}
-		i++;}
-	g=g[g.length-1]
-	if(g.obj){i=da.length-1;
-		let p=g.parent,x=p[++da[i]]
-		while(x)
-			x=p[++da[i]];
-		p[da[i]]=g={parent:g[i-1],key:da[i]
-			,t:Date.fromArray(da,i).getTime()}
-	}
-	g.obj=obj;
-	g.prop=prop;
-	g.da=da;g.t=lm;
-	if(obj.propLog[prop])
-		rem(obj.propLog[prop]);//g
-	obj.propLog[prop]=g
-	let log=db.logCache.bounds;
-	//if(log[0]==g){log[0]=null;}		// TODO: if log[0] is relocated , must find the next minimum ; if(!log[0] || log[0].t>lm) log[0]=g;
-	//if(log[1]==g){}		// T-O-D-O: if log[1] is relocated, must find the previous maximum
-	if(!log[1] || log[1].t<lm)
-		log[1]=g;
-	}
+
 ,byDate:(dt)=>{
 	let o={} // ,d=new Date(dt).toArray(),
 	function f(p,a,lvl){
@@ -193,22 +145,55 @@ db={db:{},logCache:{bounds:[0,0]},session:{}
 					,cat=o[x.cat]||(o[x.cat]={})
 					,id=cat[x.id]||(cat[x.id]={})
 					if(!id[x.prop] || id[x.prop].t<x.t)
-					id[x.prop]={t:x.t,val:db.db[x.cat][x.id].val[x.prop]}
+					id[x.prop]={t:x.t,val:db.ram.prop[x.cat][x.id].val[x.prop]}
 				}
 			}
 		}
 	}
-	f(db.logCache,[],0)
+	f(db.ram.log,[],0)
 	return o;
 	}
-
-,save:( obj,prop,dirdate)=>
-	fs.promises.mkdir('./db/prop/'+obj.cat+'/'+obj.id,{recursive:true}).then(()=>
-		fs.promises.writeFile('./db/prop/'+obj.cat+'/'+obj.id+'/'+(prop==null?'.obj':fnm)
-		, JSON.stringify(prop==null?obj.val:prop=='meta'?obj.meta: obj.val[prop])))
+,usrByCid:cid=>{
+	let a=db.ram.prop.usr,u,v;
+	if(Object.keys(a).find(uid=>
+		(u=a[uid])&&(v=u.val)&&v.cid==cid))
+		return u;}
+/*
+,findProp:(cat,prop,val)=>{
+	let a=db.ram.prop[cat],o,v;
+	if(Object.keys(a).find(id=>
+		(o=a[id])&&(v=o.val)&&v[prop]==val))
+		return o;}
+,findObj:(cat,f)=>{//bool f(obj)
+	let a=db.ram.prop[cat],o,v;
+	if(Object.keys(a).find(id=>
+		(o=a[id])&&f(o)))
+		return o;}
+,filter:(cat,f)=>{//bool f(obj)
+	let a=db.ram.prop[cat],o,v,r=[];
+	Object.keys(a).forEach(id=>
+		(o=a[id])&& f(o)?r.push(o):0 )
+	return r;}
+*/
+,save:( obj , prop , logMeta , dirdate )=>{
+	let pth='./db/prop/'+obj.cat+'/'+obj.id
+	,pNm=prop == null ? '.obj' : prop
+	,v=prop == null ? obj.val : prop == 'meta' ? obj.meta : obj.val[prop]
+	,s=JSON.stringify(v)
+	return fs.promises.mkdir(pth,{recursive:true})
+		.then(
+			()=>
+			fs.promises.writeFile(pth + pNm, s)
+			.then(() => db.log(obj, prop, logMeta, v))
+		)
+		/*,saveOld:( obj,prop,dirdate)=>
+            fs.promises.mkdir('./db/prop/'+obj.cat+'/'+obj.id,{recursive:true}).then(()=>
+                fs.promises.writeFile('./db/prop/'+obj.cat+'/'+obj.id+'/'+(prop==null?'.obj':prop)
+                , JSON.stringify(prop==null?obj.val:prop=='meta'?obj.meta: obj.val[prop])))*/
+	}
 
 ,access:(cid,cat,id)=>{//returnValue::= 0:no-access , 1:read-only , 2:write , 3:admin , 4:access
-	let r=0,d=db.db,a=[d[cat]],m
+	let r=0,d=db.ram.prop,a=[d[cat]],m
 	if(a[0]){
 		a[1]=a[0][id]
 		if(a[1]){
@@ -220,49 +205,84 @@ db={db:{},logCache:{bounds:[0,0]},session:{}
 		}
 	}return r;
 }
-,put:(cat,id,prop,val)=>{
-		if(!db.db[cat] || !db.db[cat][id])return null;
-		let o=db.db[cat][id]
+,put:(cat,id,prop,val,ssn)=>{
+		if(!db.ram.prop[cat] || !db.ram.prop[cat][id])return null;
+		let o=db.ram.prop[cat][id]
 		o.val[prop]=val;
-		db.save(cat+'/'+id,o,prop)
-		db.log(cat,id,prop,{op:'put',cid:null},val)
-		db.loglog(o,prop)
-		return o;
-	/*pool.query('replace into prop values(now(),?,?,?,?)'
-	,[cat,id,meta,val],(err,result)=>{
-		if(err)
-			return reject(err)
-		return resolve(result);
-	})*/	}
-,post:(cat,id,prop,val)=>{
-	if(db.db[cat] && db.db[cat][id])return null;
-	if(!db.db[cat])db.db[cat]={}
-	let o=db.db[cat][id]={cat:cat,id:id,log:now(),val:{}}
-	o.val[prop]=val;
-	db.save(cat+'/'+id,o,prop)
-	db.log(cat,id,prop,{op:'post',cid:null},val)
-	db.loglog(o,prop)
+		db.save(o,prop,{op:'put',uid:ssn.u.id,ssn:ssn.login})
+		return o;}
+,post:(cat,id,prop,val,ssn)=>{
+	if(!ssn||(db.ram.prop[cat] && db.ram.prop[cat][id]))return null;
+	if(!db.ram.prop[cat])db.ram.prop[cat]={}
+	let ov={},o=db.ram.prop[cat][id]={cat:cat,id:id,log:now(),val:ov}
+	ov[prop]=val;//TODO: check prop name , if meta , or other non-val name
+	db.save(o,prop,{op:'post',uid:ssn.u.id,ssn:ssn.login})
 	return o;
 	}
-,log:(cat,id,prop,meta,val)=>{
-	let t=new Date()
+,log:(obj,prop,meta,val)=>{
+	let
+	logRam=( da , lm )=>{
+			function rem(logEntry){
+			let p=logEntry.parent,k=Object.keys(p)
+			if(!p)return;
+			delete p[logEntry.key];
+			if(k.length<=3)
+			rem(p);}
+		if(!da)da=new Date(lm||obj.log).toArray();
+		if(!lm)lm=obj.log;else
+		if(obj.log<lm)obj.log=lm;
+		if(obj.propLog[prop])
+			rem(obj.propLog[prop])//delete obj.propLog[prop];
+		let g=[],i=0
+		while(i<da.length){
+			g[i]=(i==0?db.ram.log:g[i-i])[da[i]]
+			if(!g[i]){g[i]=
+				{parent:g[i-1],key:da[i],level:i,t:Date
+					.fromArray(da,i).getTime()}
+				if(i==0){
+					db.ram.log[da[0]]=g[0];
+					g[0].parent=db.ram.log;}
+			}
+			i++;}
+		g=g[g.length-1]
+		if(g.obj){i=da.length-1;
+			let p=g.parent,x=p[++da[i]]
+			while(x)
+				x=p[++da[i]];
+			p[da[i]]=g={parent:g[i-1],key:da[i]
+				,t:Date.fromArray(da,i).getTime()}
+		}
+		g.obj=obj;
+		g.prop=prop;
+		g.da=da;g.t=lm;
+		if(obj.propLog[prop])
+			rem(obj.propLog[prop]);//g
+		obj.propLog[prop]=g
+		let log=db.ram.log.bounds;
+		//if(log[0]==g){log[0]=null;}// TO DO: if log[0] is relocated , must find the next minimum ; if(!log[0] || log[0].t>lm) log[0]=g;
+		//if(log[1]==g){}	// T-O-D-O: if log[1] is relocated, must find the previous maximum
+		if(!log[1] || log[1].t<lm)
+			log[1]=g;
+	}
+	,t=new Date()
 	,da=t.toArray(),d=da.join('/')
-	,s='./db/log/'+d+'/'+cat+'/'+id+'/';
+	,s='./db/log/'+d+'/'+obj.cat+'/'+obj.id+'/';
 	fs.promises.mkdir(s,{recursive:true}).then(()=>
 		fs.promises.writeFile(s+prop, JSON.stringify({
-			cat:cat,id:id,log:t.getTime()
-			,meta:meta,prop:prop,content:content
+			cat:obj.cat,id:obj.id,log:t.getTime()
+			,meta:meta,prop:prop,content:val
 		})));
-	db.loglog(db.db[cat][id],prop,da);}
+	logRam(da);}
 };//db
-
 
 app.use(express.json());
 
-app.get('/poll/:dt',(req,resp,next)=>{
+app.get('/poll/:usrId/:dt',(req,resp,next)=>{
 	console.log('get/poll:',req,resp,next);
-	try{let results=db.byDate(req.params.dt)
-		let x={time:now(),props:results}
+	try{let p=req.params
+		,ssn=db.ram.session[p.usrId]
+		,results=ssn&&db.byDate(p.dt)
+		,x={time:now(),props:results}
 		resp.json(x);
 	}catch(ex){
 		console.log(ex);
@@ -273,16 +293,16 @@ app.get('/poll/:dt',(req,resp,next)=>{
 app.put('/login/',(req,resp,next)=>{
 	console.log('get/login:',req,resp,next);
 	try{let b=req.body,uid=b.usrId,pw=b64d(b.pw).hash(),exp=b.expire
-		, u=db.db.usr[uid]
+		, u=db.ram.prop.usr[uid]||db.usrByCid(b.cid)
 		,um=u&&u.meta&&u.meta.pw
-		,ux=u&&u.val&&u.val.expire
+		,uv=u&&u.val
+		,ux=uv&&uv.expire
 		,x=0;if(u &&((ux&&exp==ux) || (um&&um==pw))){
-			x={time:now(),log:u.log,val:u.val}
-			let s=db.session[uid];
-			if(!s)s=db.session[uid]={u:u,login:x.time};
-			u.val.login=x.time;
-			db.save('usr/'+uid,u,'login');
-			db.loglog(u,'login',null,x.time);
+			x={time:now(),log:u.log,val:uv}//TODO:poll
+			let ssn=db.session[uid];
+			if(!ssn)ssn=db.session[uid]={u:u,login:x.time};
+			uv.login=x.time;
+			db.save(u,'login',{op:'login'});
 		}
 		resp.json(x);
 	}catch(ex){
@@ -293,21 +313,21 @@ app.put('/login/',(req,resp,next)=>{
 
 app.post('/signup/',(req,resp,next)=>{
 	console.log('get/signup:',req,resp,next);
-	try{let b=req.body,uid=b.usrId,pw=b64d(b.pw).hash(),val=b.val
-		, u=db.db.usr[uid]
+	try{let b=req.body
+		,uid=b.usrId
+		,pw=b64d(b.pw).hash()
+		,val=b.val
+		, u=db.ram.prop.usr[uid]
 		,x=null;
 		if(!u){
-			u=db.db.usr[uid]={cat:'usr',log:now(),id:uid,meta:{pwd:pw},val:val}
-			x={time:now(),log:u.log,val:u.val}
-			let s=db.session[uid];
-			if(!s)s=db.session[uid]={u:u,login:x.time};
+			u=db.ram.prop.usr[uid]={cat:'usr',log:now(),id:uid,meta:{pwd:pw},val:val}
+			x={time:now(),log:u.log,val:u.val} // TODO: poll
+			let m={op:'signup'}
+			,ssn=db.session[uid]={u:u,login:x.time};
 			u.val.login=x.time;
-			db.save('usr/'+uid,u,'meta');
-			db.loglog(u,'meta',null,x.time);
-			for(let k in val){
-				db.save('usr/'+uid,u,k);
-				db.loglog(u,k,null,x.time);
-			}
+			db.save(u,'meta',m);
+			for(let k in val)
+				db.save(u,k,m);
 		}
 		resp.json(x);
 	}catch(ex){
@@ -316,10 +336,13 @@ app.post('/signup/',(req,resp,next)=>{
 	}
 })
 
-app.get('/logout/:dt',(req,resp,next)=>{
+app.get('/logout/:usrId',(req,resp,next)=>{
 	console.log('get/logout:',req,resp,next);
-	try{let results='await db.byDate(req.params.dt)'
-		let x={time:now(),props:results}
+	try{let uid=req.params.usrId
+		,ssn=db.ram.session[uid]
+		,x={time:now(),"return":ssn&&uid}
+		if(ssn)
+			delete db.ram.session[uid]
 		resp.json(x);
 	}catch(ex){
 		console.log(ex);
@@ -329,10 +352,13 @@ app.get('/logout/:dt',(req,resp,next)=>{
 
 app.put('/:cat/:id',(req,resp,next)=>{
 	console.log('put/',req,resp,next);
-	try{let p=req.params,b=req.body,results='await db.put(p.cat,p.id,b.prop,b.val)'
-		db.log(p.cat,p.id,b.prop,{op:'update',req:req},b.val)
-		let x={time:now(),props:results}
-		resp.json(x);
+	try{let p=req.params,b=req.body
+		,uid=b.usrId,x=0
+		,ssn=db.ram.session[uid]
+		if(ssn) {
+			db.put(p.cat,p.id,p.rop,p.val,ssn);
+			x = {time: now(), "return": true}//TODO: poll
+		}resp.json(x);
 	}catch(ex){
 		console.log(ex);
 		resp.sendStatus(500)
@@ -341,10 +367,12 @@ app.put('/:cat/:id',(req,resp,next)=>{
 
 app.post('/:cat/:id',(req,resp,next)=>{
 	console.log('post',req,resp,next);
-	try{let p=req.params,b=req.body,results='await db.post(p.cat,p.id,b.prop,b.val)'
-		db.log(p.cat,p.id,b.prop,{op:'create',req:req},b.val)
-		let x={time:now(),props:results}
-		resp.json(x);
+	try {let p = req.params, b = req.body,x=0
+		, uid = b.usrId, ssn = db.ram.session[uid]
+		if (ssn){
+			x=db.post(p.cat, p.id, b.prop, b.val,ssn)
+			x = {time: now(), "return": x}
+		}resp.json(x);
 	}catch(ex){
 		console.log(ex);
 		resp.sendStatus(500)
@@ -355,5 +383,4 @@ app.listen(process.env.PORT || 1024,()=>{
 	console.log('Server is running on port 1024 ,v2020-05-13-18-12');
 	db.init()
 });
-
 //console.log('indexJs : ',express,app);
