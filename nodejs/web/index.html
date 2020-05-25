@@ -75,24 +75,24 @@ function mainCtrlController($scope,$rootScope ) {
 		localStorage.coop1Usr=JSON.stringify(p.usrls);}
 
 p.srvr={
-url:'/CoopSrvlt/'
+url:'/'
 ,f:(body,url,mthd)=>fetch(p.srvr.url+(url?url:'')
 	,	{method:mthd||'post'
-		,headers: {'Content-Type': 'application/json'}
+		,headers: {'Content-Type': 'application/json'
+			,usrId:p.usrls&&p.usrls.usrId
+			,sessionStart:p.sessionStart.getTime()}
 		,body:JSON.stringify(body)}
 	)
-,signup	:(usrId,pw,val)	=>p.srvr.f({op:'signup',usrId:usrId,pw:btoa(pw),val:val})
+,signup	:(usrId,pw,val)	=>p.srvr.f({pw:btoa(pw),val:val},'signup','post')
 ,login	:(cid,pw,lm,clientTime)=>{
 	console.log('srvr.login:',lm,cid);
-	return p.srvr.f({op:'login',pw:btoa(pw),lm:lm,clientTime:clientTime})}
-,logout	:()=>{console.log('srvr.logout:');return p.srvr.f({op:'logout'})}
-,chngPw	:(pw,clientTime)	=>p.srvr.f({op:'chngPw',pw:btoa(pw),clientTime:clientTime})
-,update	:(cat,id,path,lm,val)=>p.srvr.f(val,cat+'/'+id+'/'+path,'put')
-,updateMeta:(cat,id,path,meta)=>p.srvr.f(meta,cat+'/'+id+'/'+path,'patch')
-,insert	:(cat,id,val)	=>p.srvr.f(p.srvr.url+cat+'/'+id+'/'+path,{method:'post'
-	,headers: {'Content-Type': 'application/json'}
-	,body:JSON.stringify(val)})
-,byDates	:(from,to)		=>fetch(p.srvr.url+from+'/'+to)
+	return p.srvr.f({cid:cid,pw:btoa(pw),poll:lm,clientTime:clientTime},'login','put')}
+,logout	:()=>{console.log('srvr.logout:');return p.srvr.f('','logout','get')}
+,chngPw	:(pw,clientTime)	=>p.srvr.f({op:'chngPw',pw:btoa(pw),clientTime:clientTime},'chngPw','put')
+,update	:(cat,id,path,poll,val)=>p.srvr.f({prop:path,val:val},cat+'/'+id,'put')
+,updateMeta:(cat,id,path,meta)=>p.srvr.f({prop:path,val:meta},cat+'/'+id,'patch')
+,insert	:(cat,id,val)	=>p.srvr.f({prop:path,val:val},cat+'/'+id,'post')
+,byDates	:(from,to)		=>p.srvr.f(0,'poll/'+from,'get')
 	,UserState:{
 		Non:{i:0,s:'Non'}
 		,SignupPending:{i:1,s:'SignupPending'}
@@ -140,7 +140,7 @@ url:'/CoopSrvlt/'
 		console.log('usrLogin',n,dt);
 		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt)
 		.then(r=>r.json())
-		.then(r=>{r=r&&r['return'];if(r)
+		.then(pr=>{let r=pr&&pr['return'];if(r)
 			{	p.usr=r.val;
 				try{	p.usr.state=  p.srvr.UserState.valueOf(
 					p.usr.state)||p.srvr.UserState.Non;
@@ -154,7 +154,9 @@ url:'/CoopSrvlt/'
 	}//clkLogin
 
 	p.usrLogin.init=function(sv,byDts){
-		var x=!sv && localStorage.coop1Usr,US=p.srvr.UserState,newUsr=0
+		let x=!sv && localStorage.coop1Usr
+			,US=p.srvr.UserState
+			,newUsr=0
 		if(x && !sv)
 			p.usrls=JSON.parse(x);
 		else newUsr=p.usrls=
@@ -185,11 +187,38 @@ url:'/CoopSrvlt/'
 
 	x=p.loadLSProps()
 	p.ls=x.ls;p.lslm=x.log;
-	p.inp={}
+	p.inp={};p.admInp={}
 	p.usrLogin.init()
 
-	p.lstnrs={}//cat/id/{o:<obj:lstnr>,mthdNm:<str:mthdNm ,in lstnr>}
-	
+	p.chngAdmInpObjStr=function(admInp,s){
+		let o=admInp.obj,v=JSON.parse(s);
+		o.val=v;}
+
+	p.chngAdmInpId=function(admInp,id){
+		let o=admInp.obj;
+		o.val=v;}
+
+	p.chngAdmInpCat=function(admInp,ck){
+		let o=admInp.obj,v=JSON.parse(s);
+		o.val=v;
+	}
+
+	p.admInpNewId=function(admInp){
+		let s=prompt('enter name/text for new obj');
+		if(s){let ck=admInp.catKey,cat=p.ls[ck]
+			,o={id:p.newId(),cat:ck,label:s};
+			p.srvr.insert(ck,o.id,o).then(()=>
+				p.saveLSProp(ck,o.id,cat[o.id]=admInp.obj=o)
+	)}}
+
+	p.admInpNewCat=function(admInp){
+		let s=prompt('enter name/text for new Category');
+		if(s){let o={id:p.newId(),cat:s},c;
+			p.srvr.insert(o.cat,o.id,o).then(()=>{
+				c=p.ls[admInp.catKey=o.cat]={};
+				p.saveLSProp(o.cat,o.id,c[o.id]=admInp.obj=o)
+	})}}
+
 	p.generateDay=function(dt){}
 
 	p.getAppointments=function(dt){}
@@ -301,7 +330,17 @@ appointmentsTable:{
 }
 
 </fieldset -->
-
+<fieldset><legend>DB</legend>
+	<fieldset><legend>Category:{{admInp.catKey}}</legend>
+		<select ng-model="admInp.catKey" ng-options="cat as catKey for (catKey,cat) in ls "/>
+		<input type="button" ng-click="admInpNewCat(admInp)" value="new cat">
+		<fieldset><legend>objId:{{obj.id}}</legend>
+			<select ng-model="admInp.obj" ng-options="obj as id for (id,obj) in cat "/>
+			<input type="button" ng-click="admInpNewId(admInp)" value="new obj">
+		</fieldset>
+	</fieldset>
+<textarea ng-model="admInp.objValStr" ng-change="admInpObjStrChng(admInp,admInp.objValStr)" ></textarea>
+</fieldset>
 <br/>mbohamad@kisr.edu.kw
 </body>
 </html>

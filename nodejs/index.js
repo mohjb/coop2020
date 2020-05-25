@@ -160,10 +160,6 @@ db={ram:{prop:{},log:{bounds:[0,0]},session:{}}
 				fs.promises.writeFile(pth + pNm, s)
 					.then(() => db.file.log(obj, prop, logMeta, v))
 			)
-		/*,saveOld:( obj,prop,dirdate)=>
-            fs.promises.mkdir('./db/prop/'+obj.cat+'/'+obj.id,{recursive:true}).then(()=>
-                fs.promises.writeFile('./db/prop/'+obj.cat+'/'+obj.id+'/'+(prop==null?'.obj':prop)
-                , JSON.stringify(prop==null?obj.val:prop=='meta'?obj.meta: obj.val[prop])))*/
 	}
 	,log:(obj,prop,meta,val)=>{
 		let t=new Date()
@@ -309,12 +305,30 @@ app.get('/poll/:dt',(req,resp,next)=>{
 	}
 })
 
+app.get('/logout/',(req,resp,next)=>{
+	console.log('get/logout:',req,resp,next);
+	try{let uid=req.get("usrId")
+		,ssn=db.ram.session[uid]
+		,x=null
+		if(ssn) {
+			delete db.ram.session[uid]
+			ssn.u.logout=x.time;
+			db.engine.save(u,'logout',{op:'logout'})
+			x={time:now(),"return":ssn&&uid}
+		}
+		resp.json(x);
+	}catch(ex){
+		console.log(ex);
+		resp.sendStatus(500)
+	}
+})
+
 app.put('/login/',(req,resp,next)=>{
 	console.log('get/login:',req,resp,next);
 	try{let b=req.body
 		,uid=req.get("usrId")
 		,pw=b.pw.b64d().hash()
-		,exp=b.expire
+		,exp=b.expire,poll=b.poll
 		, u=db.ram.prop.usr[uid]||db.usrByCid(b.cid)
 		,um=u&&u.meta&&u.meta.pw
 		,uv=u&&u.val
@@ -326,7 +340,8 @@ app.put('/login/',(req,resp,next)=>{
 			if(!ssn)ssn=db.ram.session[uid]={u:u,login:x.time};
 			uv.login=x.time;
 			db.engine.save(u,'login',{op:'login',usrId:uv.usrId,expire:ux});
-		}
+			if(poll)x.poll=db.byDate(poll,ssn)
+		} // app.put('/chngPw/',(req,resp,next)=>
 		resp.json(x);
 	}catch(ex){
 		console.log(ex);
@@ -337,7 +352,7 @@ app.put('/login/',(req,resp,next)=>{
 app.post('/signup/',(req,resp,next)=>{
 	console.log('get/signup:',req,resp,next);
 	try{let b=req.body
-		,uid=b.usrId
+		,uid=req.get('usrId')
 		,pw=b.pw.b64d().hash()
 		,val=b.val
 		, u=db.ram.prop.usr&&db.ram.prop.usr[uid]
@@ -359,24 +374,6 @@ app.post('/signup/',(req,resp,next)=>{
 	}
 })
 
-app.get('/logout/',(req,resp,next)=>{
-	console.log('get/logout:',req,resp,next);
-	try{let uid=req.get("usrId")
-		,ssn=db.ram.session[uid]
-		,x=null
-		if(ssn) {
-			delete db.ram.session[uid]
-			ssn.u.logout=x.time;
-			db.engine.save(u,'logout',{op:'logout'})
-			x={time:now(),"return":ssn&&uid}
-		}
-		resp.json(x);
-	}catch(ex){
-		console.log(ex);
-		resp.sendStatus(500)
-	}
-})
-
 app.put('/:cat/:id',(req,resp,next)=>{
 	console.log('put/',req,resp,next);
 	try{let p=req.params,b=req.body
@@ -384,7 +381,7 @@ app.put('/:cat/:id',(req,resp,next)=>{
 		,ssn=db.ram.session[uid]
 		if(ssn) {
 			db.put(p.cat,p.id,p.prop,p.val,ssn);
-			x = {time: now(), "return": true}//TODO: poll
+			x = {time: now(), "return": true,poll:db.byDate(p.poll,ssn)}
 		}resp.json(x);
 	}catch(ex){
 		console.log(ex);
@@ -398,14 +395,14 @@ app.post('/:cat/:id',(req,resp,next)=>{
 		,uid=req.get("usrId"), ssn = db.ram.session[uid]
 		if (ssn){
 			x=db.post(p.cat, p.id, b.prop, b.val,ssn)
-			x = {time: now(), "return": x}
+			x = {time: now(), "return": x ,poll:db.byDate(p.poll,ssn) }
 		}resp.json(x);
 	}catch(ex){
 		console.log(ex);
 		resp.sendStatus(500)
 	}
 })
-
+//app.static
 app.listen(process.env.PORT || 1024,()=>{
 	console.log('Server is running on port 1024 ,v2020-05-13-18-12');
 	db.engine=db.file;
