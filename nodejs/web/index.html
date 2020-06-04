@@ -1,5 +1,8 @@
 <html ng-app="app" ng-controller="MainCtrl"><body>
-<script src="/angular-1.6.4/angular.min.js"></script>
+<script src="/angular.min.js"></script>
+<link href="jsoneditor/jsoneditor.min.css" rel="stylesheet" type="text/css">
+<script src="jsoneditor/jsoneditor.min.js"></script>
+
 <script defered>
 (window.xa=app=(angular||{}).module('app', [] ))
 
@@ -10,7 +13,7 @@ dbg=true;//String.prototype.startsWith=s=>this.substr(s.length)=s
 
 app.controller('MainCtrl',['$scope',
 function mainCtrlController($scope,$rootScope ) {
-	var p=app.p=$scope ;p.app=app;
+	var p=app.p=$scope ;p.app=app;p.dbg=dbg;
 	p.newId=function(){return now();}
 	p.sessionStart=new Date();
 
@@ -28,7 +31,8 @@ function mainCtrlController($scope,$rootScope ) {
 		for(var cat in d[7]){d[8]=d[7][cat]
 		for(var id in d[8]){o=d[8][id]
 			x=new Date(y,mnth,dy,hr,mn,sc,ms).getTime() // 
-			if((!p.usrls.srvrLM)||(p.usrls.srvrLM<x)){p.usrls.srvrLM=x;}
+			if((!p.usrls.srvrLM)||(p.usrls.srvrLM<x)){
+				p.usrls.srvrLM=x;}
 			p.saveLSProp(cat,id,o)
 			p.onSrvrChng(cat,id,o)
 	}}}}}}}}}
@@ -60,12 +64,12 @@ function mainCtrlController($scope,$rootScope ) {
 		var d,o,k
 		for(var cat in ls){d=ls[cat]
 		for(var id in d){o=d[id]
-			p.saveLSProp(cat,id,o)
+			p.saveLSProp(o,cat,id)
 		}}}
 
 	//prop::= log,cat,id,meta,val
-	p.saveLSProp=function(cat,id,prop){
-		var k='coop1|'+cat+'|'+id
+	p.saveLSProp=function(prop,cat,id){
+		var k='coop1|'+(cat||prop.cat)+'|'+(id||prop.id)
 		,s=JSON.stringify(prop);
 		localStorage[k]=s;
 		console.log('saveLSProp:',k,s);
@@ -77,21 +81,25 @@ function mainCtrlController($scope,$rootScope ) {
 p.srvr={
 url:'/'
 ,f:(body,url,mthd)=>fetch(p.srvr.url+(url?url:'')
-	,	{method:mthd||'post'
-		,headers: {'Content-Type': 'application/json'
-			,usrId:p.usrls&&p.usrls.usrId
-			,sessionStart:p.sessionStart.getTime()}
-		,body:JSON.stringify(body)}
+	,	((a,b)=>{if(b)a.body=b;return a;})({
+				method: mthd || 'post'
+				, headers: {
+					'Content-Type': 'application/json'
+					, usrId: p.usrls && p.usrls.usrId
+					, sessionStart: p.sessionStart.getTime()
+				}
+			},mthd!='get'&&JSON.stringify(body))
 	)
-,signup	:(usrId,pw,val)	=>p.srvr.f({pw:btoa(pw),val:val},'signup','post')
-,login	:(cid,pw,lm,clientTime)=>{
+,signup	:(//usrId,
+			 pw,val)	=>p.srvr.f({pw:btoa(pw),val:val},'signup','post')
+,login	:(cid,pw,lm,clientTime,expire)=>{
 	console.log('srvr.login:',lm,cid);
-	return p.srvr.f({cid:cid,pw:btoa(pw),poll:lm,clientTime:clientTime},'login','put')}
+	return p.srvr.f({cid:cid,pw:btoa(pw),poll:lm,clientTime:clientTime,expire:expire},'login','put')}
 ,logout	:()=>{console.log('srvr.logout:');return p.srvr.f('','logout','get')}
 ,chngPw	:(pw,clientTime)	=>p.srvr.f({op:'chngPw',pw:btoa(pw),clientTime:clientTime},'chngPw','put')
 ,update	:(cat,id,path,poll,val)=>p.srvr.f({prop:path,val:val},cat+'/'+id,'put')
 ,updateMeta:(cat,id,path,meta)=>p.srvr.f({prop:path,val:meta},cat+'/'+id,'patch')
-,insert	:(cat,id,val)	=>p.srvr.f({prop:path,val:val},cat+'/'+id,'post')
+,insert	:(cat,id,val)	=>p.srvr.f({val:val},cat+'/'+id,'post')
 ,byDates	:(from,to)		=>p.srvr.f(0,'poll/'+from,'get')
 	,UserState:{
 		Non:{i:0,s:'Non'}
@@ -116,7 +124,11 @@ url:'/'
 			  ,
 				r=>r.json()
 			  ,
-				r=>r?p.onByDate(r['return']):{}
+				pr=>{let r=pr['return'];
+					if(r)
+						p.onByDate(r);
+					if(p.usrls.expire=pr.expire)
+						p.saveLSUsr();}
 			  ,
 				()=>{var n=now()
 					if(n>=o.trgt){o.trgt=n+o.period
@@ -138,14 +150,16 @@ url:'/'
 	p.usrLogin=()=>{
 		var n=p.inp,dt=now();
 		console.log('usrLogin',n,dt);
-		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt)
+		p.srvr.login(n.cid,n.pw,(p&&p.usrls&&p.usrls.srvrLM)||1,dt,p.usrls.expire)
 		.then(r=>r.json())
 		.then(pr=>{let r=pr&&pr['return'];if(r)
 			{	p.usr=r.val;
-				try{	p.usr.state=  p.srvr.UserState.valueOf(
+				try{p.usr.state=  p.srvr.UserState.valueOf(
 					p.usr.state)||p.srvr.UserState.Non;
+					p.usrls.usrId=pr.usrId;
+					p.usrls.expire=pr.expire;
 				}catch(ex){}
-				p.usrLogin.init(true,r.byDates)
+				p.usrLogin.init(true,r.poll)
 				console.log('usrLogin:response',r);
 				return p.saveLSUsr();}
 			else
@@ -159,8 +173,14 @@ url:'/'
 			,newUsr=0
 		if(x && !sv)
 			p.usrls=JSON.parse(x);
-		else newUsr=p.usrls=
+		else{ newUsr=p.usrls=
 			{usrId:sv=p.newId(),coopId:0,srvrLM:0}
+			let coop={cat:'coop',id:'1',label:'test-coop',emp:['1']}
+			p.saveLSProp(coop);
+		}
+		if(!p.usr)
+			p.usr=p.usrls.val||{coop:dbg&&p.ls.coop[1]};
+
 		p.screen='consumer';
 		if(!p.usrls.pollPeriod)
 			p.usrls.pollPeriod=1000*20
@@ -171,7 +191,7 @@ url:'/'
 		p.usrls.state=p.usr.state.s|| US[
 			dbg?'Ready':'Non'
 			].s;
-		p.usrls.login=dt;
+		p.usrls.login=now();
 		p.usrls.cid=p.usr.id;
 		p.usrls.expire=p.usr.expire
 		if(byDts)
@@ -208,7 +228,7 @@ url:'/'
 		if(s){let ck=admInp.catKey,cat=p.ls[ck]
 			,o={id:p.newId(),cat:ck,label:s};
 			p.srvr.insert(ck,o.id,o).then(()=>
-				p.saveLSProp(ck,o.id,cat[o.id]=admInp.obj=o)
+				p.saveLSProp(cat[o.id]=admInp.obj=o)
 	)}}
 
 	p.admInpNewCat=function(admInp){
@@ -216,7 +236,7 @@ url:'/'
 		if(s){let o={id:p.newId(),cat:s},c;
 			p.srvr.insert(o.cat,o.id,o).then(()=>{
 				c=p.ls[admInp.catKey=o.cat]={};
-				p.saveLSProp(o.cat,o.id,c[o.id]=admInp.obj=o)
+				p.saveLSProp(c[o.id]=admInp.obj=o)
 	})}}
 
 	p.generateDay=function(dt){}
@@ -261,6 +281,30 @@ url:'/'
 	p.inp.apptDay=new Date()
 	p.appointmentsTable=p.generateDayAppointments( p.inp.apptDay )
 
+	function initAdmJSEd(){try{
+		// create the editor
+		const container = did('admJSEd') ; // angular.element("admJSEd") // document.getElementById
+		const options = {}
+		const editor = new JSONEditor(container, options)
+
+		/* / set json
+		const initialJson = {
+			"Array": [1, 2, 3],
+			"Boolean": true,
+			"Null": null,
+			"Number": 123,
+			"Object": {"a": "b", "c": "d"},
+			"String": "Hello World"
+		}*/
+		editor.set(p.ls)
+
+		// get json
+		const updatedJson = editor.get()
+	}catch(ex){
+		console.error(ex);
+	}}
+	setTimeout(initAdmJSEd,100)
+
 	console.log('controller:MainCntrl: app=',app,' ,scope=',p )
 }
 ]
@@ -268,7 +312,7 @@ url:'/'
 </script>
 <h1>Coop Appointments</h1>
 
-<fieldset ng-if="!usr.state"><legend>login</legend>
+<fieldset ng-if="!usr.state || usr.state.i < 1"><legend>login</legend>
 	<form id=frmLogin><table border=1>
 		<tr><td>Civil Id No.</td><td><input ng-model="inp.cid"/></td></tr>
 		<tr><td>Password</td><td><input ng-model="inp.pw" type="password"/></td></tr>
@@ -309,9 +353,10 @@ url:'/'
 	<div ng-if="usr.state.s=='Ready'">Ready
 		<input type="date" ng-model="inp.apptDay" ng-change="chngDt()"/>
 		<span ng-repeat="x in appointmentsTable" ><br/>
-			<input type="radio" ng-value="x.id" id="{{x.id}}"
-				ng-model="inp.apptTime"
-			/><label for="{{x.id}}">{{tm2s(x.t)}}</label></span>
+			<input type="button" ng-value="tm2s(x.t)" id="{{x.id}}"
+				ng-style="x.t==inp.appTime ? {bgColor:yellow}:''"
+				ng-click="inp.apptTime=x.id"
+			/></span>
 	inp={{inp|json}}
 	</div>
 	<div ng-if="usr.state.s=='QueuePending'">QueuePending</div>
@@ -330,16 +375,21 @@ appointmentsTable:{
 }
 
 </fieldset -->
-<fieldset><legend>DB</legend>
+<fieldset ng-if="dbg"><legend>DB</legend>
 	<fieldset><legend>Category:{{admInp.catKey}}</legend>
-		<select ng-model="admInp.catKey" ng-options="cat as catKey for (catKey,cat) in ls "/>
+		<select ng-model="admInp.catKey" ng-options="cat as catKey for (catKey,cat) in ls " ng-change="chngAdmInoCat(admInp,catKey)"/>
 		<input type="button" ng-click="admInpNewCat(admInp)" value="new cat">
-		<fieldset><legend>objId:{{obj.id}}</legend>
-			<select ng-model="admInp.obj" ng-options="obj as id for (id,obj) in cat "/>
+		<fieldset><legend>objId:{{admInp.obj.id}}</legend>
+			<select ng-model="admInp.obj" ng-options="obj as id for (id,obj) in cat " ng-change="chngAdmInpId(admInp,id)"/>
 			<input type="button" ng-click="admInpNewId(admInp)" value="new obj">
+			<fieldset><legend>prop:{{admInp.propNm}}</legend>
+				<select ng-model="admInp.propNm" ng-options="propX as id for (pNm,pVal) in cat " ng-change="chngAdmInpId(admInp,id)"/>
+				<input type="button" ng-click="admInpNewId(admInp)" value="new obj">
+			</fieldset>
 		</fieldset>
 	</fieldset>
 <textarea ng-model="admInp.objValStr" ng-change="admInpObjStrChng(admInp,admInp.objValStr)" ></textarea>
+	<div id="admJSEd">JSEd</div>
 </fieldset>
 <br/>mbohamad@kisr.edu.kw
 </body>

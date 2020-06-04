@@ -98,11 +98,11 @@ const express=require('express');
 const app=express();
 const fs=require('fs');
 
-db={ram:{prop:{},log:{bounds:[0,0]},session:{}}
+db={ram:{prop:{},log:{bounds:[0,0]},session:{pollPeriod:1000*20}}
 ,engine:0
-,file:{
-	init:()=>{
-		let root=['.','db','prop']//,rn=root.length
+,file:{root:[['.','db'],['prop'],['log']]
+	,init:()=>{
+		let fr=db.file.root,root=fr[0].concat(fr[1][0])
 			,f=(pathArr,parent,lvl)=>{
 			function fileClosure(pth,obj,prop){
 				fs.promises.readFile(pth,'utf-8').
@@ -151,25 +151,27 @@ db={ram:{prop:{},log:{bounds:[0,0]},session:{}}
 		f(root , db.ram.prop , 0 );
 	}
 	,save:( obj , prop , logMeta , dirdate )=>{
-		let pth='./db/prop/'+obj.cat+'/'+obj.id+'/'
+		let fr=db.file.root
+		,pth,pa=fr[0].concat(fr[1])
 			,pNm=prop == null ? '.obj' : prop
 			,v=prop == null ? obj.val : prop == 'meta' ? obj.meta : obj.val[pNm]
-			,s=JSON.stringify(v)
-		return fs.promises.mkdir(pth,{recursive:true})
+			,s=JSON.stringify(v);pa.push(obj.cat,obj.id,'')
+		return fs.promises.mkdir(pth=pa.join('/'),{recursive:true})
 			.then(()=>
-				fs.promises.writeFile(pth + pNm, s)
-					.then(() => db.file.log(obj, prop, logMeta, v))
+				fs.promises.writeFile(pth + pNm, s).then
+				(x=> db.file.log(obj, prop, logMeta, v))
 			)
 	}
 	,log:(obj,prop,meta,val)=>{
-		let t=new Date()
-			,da=t.toArray(),d=da.join('/')
-			,s='./db/log/'+d+'/'+obj.cat+'/'+obj.id+'/'
+		let t=new Date(),fr=db.file.root
+			,da=t.toArray()//,d=da.join('/')
+			,s,sa=fr[0].concat(fr[2]).concat(da) //'./db/log/'+d+'/'+obj.cat+'/'+obj.id+'/'
 			,o={cat:obj.cat,id:obj.id,log:t.getTime()
 			,meta:meta,prop:prop,val:val};
-		o.prev=db.logRam(obj,prop,da);
+		o.prev=db.logRam(obj,prop,da);//sa.push(obj.cat,obj.id,'');
+		s=sa.join('/');
 		fs.promises.mkdir(s,{recursive:true}).then(()=>
-			fs.promises.writeFile(s+prop, JSON.stringify(o)));
+			fs.promises.writeFile(s+'/'+prop, JSON.stringify(o)))
 	}
 }//file storage-engine
 
@@ -291,14 +293,22 @@ db={ram:{prop:{},log:{bounds:[0,0]},session:{}}
 };//db
 
 app.use(express.json());
+function conlog(m,q){
+	console.log(m,'originalUrl=',q.originalUrl
+		,' ,body=',q.body,' ,params='
+		,q.params,new Date());} // q.signedCookies , q.subdomains
 
 app.get('/poll/:dt',(req,resp,next)=>{
-	console.log('get/poll:',req,resp,next);
+	conlog('get/poll:',req);
 	try{let uid=req.get("usrId")
 		,ssn=db.ram.session[uid]
 		,results=ssn&&db.byDate(req.params.dt,ssn)
-		,x={time:now(),"return":results}
+		,n=now()
+		,x={time:n,"return":results}
 		resp.json(x);
+		if(ssn){x.expire=ssn.u.
+			val.expire=n+db.ram.session.pollPeriod
+			db.engine.save(ssn.u,'expire',{op:'poll'})}
 	}catch(ex){
 		console.log(ex);
 		resp.sendStatus(500)
@@ -306,7 +316,7 @@ app.get('/poll/:dt',(req,resp,next)=>{
 })
 
 app.get('/logout/',(req,resp,next)=>{
-	console.log('get/logout:',req,resp,next);
+	conlog('get/logout:',req,resp,next);
 	try{let uid=req.get("usrId")
 		,ssn=db.ram.session[uid]
 		,x=null
@@ -324,23 +334,23 @@ app.get('/logout/',(req,resp,next)=>{
 })
 
 app.put('/login/',(req,resp,next)=>{
-	console.log('get/login:',req,resp,next);
+	conlog('get/login:',req,resp,next);
 	try{let b=req.body
 		,uid=req.get("usrId")
 		,pw=b.pw.b64d().hash()
 		,exp=b.expire,poll=b.poll
-		, u=db.ram.prop.usr[uid]||db.usrByCid(b.cid)
+		,u=(b.cid&&db.usrByCid(b.cid))||db.ram.prop.usr[uid]
 		,um=u&&u.meta&&u.meta.pw
 		,uv=u&&u.val
 		,ux=uv&&uv.expire
 		,x=0;if(u &&((ux&&exp==ux) || (um&&um==pw))){
-			x={time:now(),log:u.log,val:uv}//TODO:poll
-			if(!uid)uid=uv.usrId||u.id||uv.cid;
+			x={time:now(),usrId:uid=u.id||uv.usrId,return:{log:u.log,val:uv}}//TODO:poll
+			//if(!uid)uid=uv.usrId||u.id||uv.cid;
 			let ssn=db.ram.session[uid];
 			if(!ssn)ssn=db.ram.session[uid]={u:u,login:x.time};
 			uv.login=x.time;
 			db.engine.save(u,'login',{op:'login',usrId:uv.usrId,expire:ux});
-			if(poll)x.poll=db.byDate(poll,ssn)
+			if(poll)x['return'].poll=db.byDate(poll,ssn)
 		} // app.put('/chngPw/',(req,resp,next)=>
 		resp.json(x);
 	}catch(ex){
@@ -350,7 +360,7 @@ app.put('/login/',(req,resp,next)=>{
 })
 
 app.post('/signup/',(req,resp,next)=>{
-	console.log('get/signup:',req,resp,next);
+	conlog('get/signup:',req,resp,next);
 	try{let b=req.body
 		,uid=req.get('usrId')
 		,pw=b.pw.b64d().hash()
@@ -361,7 +371,7 @@ app.post('/signup/',(req,resp,next)=>{
 			u=db.ram.prop.usr[uid]={cat:'usr',log:now(),id:uid,meta:{pwd:pw},val:val}
 			x={time:now(),log:u.log,val:u.val} // TODO: poll
 			let m={op:'signup'}
-			,ssn=db.session[uid]={u:u,login:x.time};
+			,ssn=db.ram.session[uid]={u:u,login:x.time};
 			u.val.login=x.time;
 			db.engine.save(u,'meta',m);
 			for(let k in val)
@@ -375,7 +385,7 @@ app.post('/signup/',(req,resp,next)=>{
 })
 
 app.put('/:cat/:id',(req,resp,next)=>{
-	console.log('put/',req,resp,next);
+	conlog('put/',req,resp,next);
 	try{let p=req.params,b=req.body
 		,uid=req.get("usrId"),x=null
 		,ssn=db.ram.session[uid]
@@ -390,7 +400,7 @@ app.put('/:cat/:id',(req,resp,next)=>{
 })
 
 app.post('/:cat/:id',(req,resp,next)=>{
-	console.log('post',req,resp,next);
+	conlog('post',req,resp,next);
 	try {let p = req.params, b = req.body,x=0
 		,uid=req.get("usrId"), ssn = db.ram.session[uid]
 		if (ssn){
@@ -402,7 +412,8 @@ app.post('/:cat/:id',(req,resp,next)=>{
 		resp.sendStatus(500)
 	}
 })
-//app.static
+
+app.use(express.static('./web/'))
 app.listen(process.env.PORT || 1024,()=>{
 	console.log('Server is running on port 1024 ,v2020-05-13-18-12');
 	db.engine=db.file;
