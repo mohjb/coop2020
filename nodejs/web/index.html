@@ -7,6 +7,7 @@
 (window.xa=app=(angular||{}).module('app', [] ))
 
 now=()=>(new Date()).getTime();
+function cl(){console.log.apply(console,arguments);}
 
 did=p=>document.getElementById(p);
 dbg=true;//String.prototype.startsWith=s=>this.substr(s.length)=s
@@ -284,9 +285,41 @@ url:'/'
 	function initAdmJSEd(){try{
 		// create the editor
 		const container = did('admJSEd') ; // angular.element("admJSEd") // document.getElementById
-		const options = {}
-		const editor = new JSONEditor(container, options)
+		let x=p.admInp.jse={editor:0,options:0,container:container,evts:[]}
+		const options = {
+			old:{path:[],val:0}
+			,onEvent:function(e,me){
+			let y=me&&me.type,path=e.path||me.path;
+			if(!y|| "mouse"!=y.substr(0,5)){
+				x.evts.unshift(e);
+				cl('admJSE.onEvent:type=',y,' ,path=',path,' ,e=',e,' ,me=',me,' ,args=',arguments)
+			}}
+		/*
+		onTextSelectionChange
+		* onFocus
+		* onBlur
+		onEditable
+		onChange
+		onChangeText
+		onValidate
+		onValidationError
+		onError
+		onChangeJSON
+		onModeChange
+		onDone
+		onOpen
+		onClose
+		onCreateMenu
+		onClassName
+		onEvent
+		onColorPicker
+		onNodeName
+		onSelectionChange
 
+		* */
+		}
+		const editor = new JSONEditor(container, options)
+		x.editor=editor;x.options=options;
 		/* / set json
 		const initialJson = {
 			"Array": [1, 2, 3],
