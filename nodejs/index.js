@@ -231,11 +231,25 @@ db={ram:{prop:{},log:{bounds:[0,0]},session:{pollPeriod:1000*20}}
 		}
 	}return r;
 }
-,put:(cat,id,prop,val,ssn)=>{
+,put:(cat,id,prop,jsonPropPathArr,val,ssn)=>{
 		if(!db.ram.prop[cat] || !db.ram.prop[cat][id])return null;
 		let o=db.ram.prop[cat][id]
-		o.val[prop]=val;
-		db.engine.save(o,prop,{op:'put',uid:ssn.u.id,ssn:ssn.login})
+		if(!jsonPropPathArr || jsonPropPathArr.length<1)
+			o.val[prop]=val;
+		else{
+			let x=o.val[prop],g,i=0
+				,a=jsonPropPathArr,n=a.length-1
+			if(!x)x=o.val[prop]={}
+			while(i<n-1){
+				let pn=a[i++]
+				g=x[pn];
+				if(!g)g=x[pn]={}
+				x=g;
+			}
+			x[a[n]]=val;
+		}
+		db.engine.save(o,prop,{op:'put',uid:ssn.u.id
+			,jsonPropPathArr:jsonPropPathArr,ssn:ssn.login})
 		return o;}
 ,post:(cat,id,prop,val,ssn)=>{
 	if(!ssn||(db.ram.prop[cat] && db.ram.prop[cat][id]))return null;
@@ -384,13 +398,13 @@ app.post('/signup/',(req,resp,next)=>{
 	}
 })
 
-app.put('/:cat/:id',(req,resp,next)=>{
+app.put('/:cat/:id/:prop',(req,resp,next)=>{
 	conlog('put/',req,resp,next);
 	try{let p=req.params,b=req.body
 		,uid=req.get("usrId"),x=null
 		,ssn=db.ram.session[uid]
 		if(ssn) {
-			db.put(p.cat,p.id,p.prop,p.val,ssn);
+			db.put(p.cat,p.id,p.prop,b.path,b.val,ssn);
 			x = {time: now(), "return": true,poll:db.byDate(p.poll,ssn)}
 		}resp.json(x);
 	}catch(ex){
@@ -399,12 +413,12 @@ app.put('/:cat/:id',(req,resp,next)=>{
 	}
 })
 
-app.post('/:cat/:id',(req,resp,next)=>{
+app.post('/:cat/:id/:prop',(req,resp,next)=>{
 	conlog('post',req,resp,next);
 	try {let p = req.params, b = req.body,x=0
 		,uid=req.get("usrId"), ssn = db.ram.session[uid]
 		if (ssn){
-			x=db.post(p.cat, p.id, b.prop, b.val,ssn)
+			x=db.post(p.cat, p.id, p.prop, b.val,ssn)
 			x = {time: now(), "return": x ,poll:db.byDate(p.poll,ssn) }
 		}resp.json(x);
 	}catch(ex){

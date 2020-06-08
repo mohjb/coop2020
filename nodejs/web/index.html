@@ -8,7 +8,8 @@
 
 now=()=>(new Date()).getTime();
 function cl(){console.log.apply(console,arguments);}
-
+Array.prototype.equals=function(a){
+	let b=a.length==this.length;if(b)this.some((e,i)=>a[i]!=e);return b;}
 did=p=>document.getElementById(p);
 dbg=true;//String.prototype.startsWith=s=>this.substr(s.length)=s
 
@@ -32,15 +33,12 @@ function mainCtrlController($scope,$rootScope ) {
 		for(var cat in d[7]){d[8]=d[7][cat]
 		for(var id in d[8]){o=d[8][id]
 			x=new Date(y,mnth,dy,hr,mn,sc,ms).getTime() // 
-			if((!p.usrls.srvrLM)||(p.usrls.srvrLM<x)){
-				p.usrls.srvrLM=x;}
+			if((!p.usrls.srvrLM)||(p.usrls.srvrLM<x))
+				p.usrls.srvrLM=x;
 			p.saveLSProp(cat,id,o)
-			p.onSrvrChng(cat,id,o)
 	}}}}}}}}}
 	p.usrls.clientTime=now()
 	}
-
-	p.onSrvrChng=function(cat,id,prop){}//p.fireLstnrs(cat,id,prop)
 
 	p.loadLSProps=function(){
 		var a=[],ls={},ks,b,cat,id,c,o,log=0
@@ -91,17 +89,15 @@ url:'/'
 				}
 			},mthd!='get'&&JSON.stringify(body))
 	)
-,signup	:(//usrId,
-			 pw,val)	=>p.srvr.f({pw:btoa(pw),val:val},'signup','post')
+,signup	:(pw,val)	=>p.srvr.f({pw:btoa(pw),val:val},'signup','post')
 ,login	:(cid,pw,lm,clientTime,expire)=>{
 	console.log('srvr.login:',lm,cid);
 	return p.srvr.f({cid:cid,pw:btoa(pw),poll:lm,clientTime:clientTime,expire:expire},'login','put')}
 ,logout	:()=>{console.log('srvr.logout:');return p.srvr.f('','logout','get')}
 ,chngPw	:(pw,clientTime)	=>p.srvr.f({op:'chngPw',pw:btoa(pw),clientTime:clientTime},'chngPw','put')
-,update	:(cat,id,path,poll,val)=>p.srvr.f({prop:path,val:val},cat+'/'+id,'put')
-,updateMeta:(cat,id,path,meta)=>p.srvr.f({prop:path,val:meta},cat+'/'+id,'patch')
-,insert	:(cat,id,val)	=>p.srvr.f({val:val},cat+'/'+id,'post')
-,byDates	:(from,to)		=>p.srvr.f(0,'poll/'+from,'get')
+,update	:(cat,id,prop,path,poll,val)=>p.srvr.f({path:path,val:val},cat+'/'+id+'/'+prop,'put')
+,insert	:(cat,id,prop,val)	=>p.srvr.f({val:val},cat+'/'+id+'/'+prop,'post')
+,byDates:from				=>p.srvr.f(0,'poll/'+from,'get')
 	,UserState:{
 		Non:{i:0,s:'Non'}
 		,SignupPending:{i:1,s:'SignupPending'}
@@ -253,7 +249,7 @@ url:'/'
 	,st=c.noPeoplePerTimeSlot||1 // simultanious people in the same time slot
 	,period=c.timeSlotPeriod||30*60*1000
 	,d,dt,x,wh
-	for(var ai in wha){
+	for(var ai in wha)try{
 		wh=wha[ai]
 		d=new Date(t.getFullYear(),t.getMonth(),t.getDate()
 			,wh[0].getHours(),wh[0].getMinutes() )
@@ -266,6 +262,8 @@ url:'/'
 			a.push({id:dt,t:d})
 			d=new Date(dt+period);dt=d.getTime();
 		}
+	}catch(ex){
+		console.error(ex)
 	}
 	return a;
  }
@@ -285,14 +283,38 @@ url:'/'
 	function initAdmJSEd(){try{
 		// create the editor
 		const container = did('admJSEd') ; // angular.element("admJSEd") // document.getElementById
-		let x=p.admInp.jse={editor:0,options:0,container:container,evts:[]}
+		let x=p.admInp.jse={old:{path:[],val:0,q:{}}
+			,editor:0,options:0,container:container,evts:[]}
 		const options = {
-			old:{path:[],val:0}
-			,onEvent:function(e,me){
-			let y=me&&me.type,path=e.path||me.path;
+			onEvent:function(e,me){
+			let y=me&&me.type,path=e.path||me.path,ev=e&&e.value;
 			if(!y|| "mouse"!=y.substr(0,5)){
 				x.evts.unshift(e);
-				cl('admJSE.onEvent:type=',y,' ,path=',path,' ,e=',e,' ,me=',me,' ,args=',arguments)
+				let o=p.admInp.jse.old,op=o.path
+				if(path.length>2 &&(!op || !op.equals(path) || o.val!=ev)){
+					let cat=path[0],id=path[1],prop=path[2],p0=path
+						,db=p.ls,co=db[cat],io=co&&co[id];
+					path=p0.slice(3)
+					cl('admJSE.onEvent:type=',y,' ,path=',p0,' ,e=',e,' ,me=',me,' ,args=',arguments)
+					o.cat=cat;o.id=id;o.path=p0;o.val=ev;
+					if(!co || !io ) {
+						if(path&& path.length>0){
+							let x=co={};io=0;
+							db=path[io++];
+							while(io<path.length) {
+								x[db]={}
+								x=x[db];
+								db=path[io++];
+								}
+							x[db]=val;
+							val=co;
+							}
+						p.srvr.insert(cat, id, val)
+						.then(r=>p.saveLSProp(o,cat,id))
+					}else if (y=='change')
+						p.srvr.update(cat,id,prop,path,p.usrls.srvrLM,val)
+						.then(r=>p.saveLSProp(o,cat,id))
+				}
 			}}
 		/*
 		onTextSelectionChange
