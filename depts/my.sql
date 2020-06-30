@@ -81,7 +81,7 @@ CREATE TABLE `msgAttachment` (
 	`meta` json,
 	`msg` int(11) NOT NULL,
 	`path` text,
-	'mime` text,
+	`mime` text,
 	`payload` longblob ,
 	KEY `index3` (`dt`),
 	FOREIGN KEY (`msg`) REFERENCES `msg` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
