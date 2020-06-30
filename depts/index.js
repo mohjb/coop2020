@@ -10,8 +10,8 @@ function conlog(m,q){
 app.get('/test/:dt',(req,resp,next)=>{
     conlog('get/test:',req);
     try{let uid=req.get("usrId")
-        ,results='ok'
-        ,n=now()
+        ,results='okTest'
+        ,n=new Date()
         ,x={time:n,"return":results}
         resp.json(x);
     }catch(ex){
@@ -20,7 +20,6 @@ app.get('/test/:dt',(req,resp,next)=>{
     }
 })
 
-app.use(express.static('./web/'))
 app.listen(process.env.PORT || 80,()=>{
     console.log('Server is running on port 80 ,v2020-06-30-22-36');
 });
