@@ -1,424 +1,483 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>BeizerCurve in js+canvas</title>
 <script defer>
-amos= {
-    man: d = {
-        cntrlPnts: [0, 0, 0], n: 3// the control points of the beizer-curve , so that the gui(user) can control(relocate a choosen point)
-        , sub: 0, lvl: -1//sub&lvl for compatibility with point-internals
-        , m: {x: 0, y: 0}//m::= mouse-coords onmousemove on canvas
-        , t: 0//t::= normal value(0.0 to 1.0) for animating the drawing of the curve
-        , dt: 0.01
-        , down: {p: 0, m: {x: 0, y: 0}, pc: {x: 0, y: 0}, flag: 0}//p::=ref to closest Point-object ; m::=mouse-coords when mouse-down ; c::= point-coords of closest when mouse-down ; flag::= bool if mouse-button is currently down
-        , dom: {canvs: 0, N: 0, anim: 0, lines: 0, curv: 0, info: 0, ctrl: 0}
-        , closest: {
-            p: 0, dist: 0
-            , find: function () {
-                let c = d.closest, o = c.p //,oz=c.dist;
-                c.dist = Number.MAX_VALUE;
-                d.cntrlPnts.forEach(p => {
-                    let z = p.dist();
-                    if (z < c.dist) {
-                        c.dist = z;
-                        c.p = p;
-                    }
-                });
-                if (o != c.p) console.log('closest=', c.p, ',old=', o);
-                return c.p;
-            }
-        } //
-        , resz: function () {
-            let q = d.dim, p = d.dom.canvs
-            q.w = p.width = document.body.clientWidth
-            q.h = p.height = document.body.clientHeight
-            q.r = q.h / (d.n + 1)
-            q.cx = q.w / 2;
-            q.cy = q.h / 2;
-            q.ang = Math.PI * 2 / (d.n + 2)//d.ctx=p.getContext('2d')
-        }
-        , chngN: function (n) {
-            let o = d.sub, a;//{a:d.sub,b:d.sub.sub,n:d.n,z:d.cntrlPnts};
-            a = d.buildTree(n);
-            while (a && o) {
-                a.set(o);
-                a = a.nxt;
-                o = o.nxt;
-            }
+d = {
+	cntrlPnts: [0, 0, 0], n: 3// the control points of the beizer-curve , so that the gui(user) can control(relocate a choosen point)
+	, sub: 0, lvl: -1//sub&lvl for compatibility with point-internals
+	, m: {x: 0, y: 0}//m::= mouse-coords onmousemove on canvas
+	, t: 0//t::= normal value(0.0 to 1.0) for animating the drawing of the curve
+	, dt: 0.01
+	, down: {p: 0, m: {x: 0, y: 0}, pc: {x: 0, y: 0}, flag: 0}//p::=ref to closest Point-object ; m::=mouse-coords when mouse-down ; c::= point-coords of closest when mouse-down ; flag::= bool if mouse-button is currently down
+	, dom: {canvs: 0, N: 0, anim: 0, lines: 0, curv: 0, info: 0, ctrl: 0}
+	, closest: {
+		p: 0, dist: 0
+		, find: function () {
+			let c = d.closest, o = c.p //,oz=c.dist;
+			c.dist = Number.MAX_VALUE;
+			d.cntrlPnts.forEach(p => {
+				let z = p.dist();
+				if (z < c.dist) {
+					c.dist = z;
+					c.p = p;
+				}
+			});
+			if (o != c.p) console.log('closest=', c.p, ',old=', o);
+			return c.p;
+		}
+	} //
+	, resz: function () {
+		let q = d.dim, p = d.dom.canvs
+		q.w = p.width = document.body.clientWidth
+		q.h = p.height = document.body.clientHeight
+		q.r = q.h / (d.n + 1)
+		q.cx = q.w / 2;
+		q.cy = q.h / 2;
+		q.ang = Math.PI * 2 / (d.n + 2)//d.ctx=p.getContext('2d')
+	}
+	, chngN: function (n) {
+		let o = d.sub, a;
+		a = d.buildTree(n);
+		while (a && o) {
+			a.set(o);
+			a = a.nxt;
+			o = o.nxt;
+		}
+	}//chngN
 
-            /*	d.cntrlPnts.forEach((e,i)=>{if(!e){
-			d.cntrlPnts[i]=new Point(0,i,d);if(i<n-1)
-				init(d.cntrlPnts[i],(d.cntrlPnts[i+1]
-					||(d.cntrlPnts[i+1]=new Point(0,i+1,d))))
-		}})
+	, mousMv: function (evt) {
+		d.m.x = event.clientX;
+		d.m.y = event.clientY;
+		d.closest.find();
+		if (d.down.flag)
+			d.mousDrg();
+		//did('info').innerText='down='+JSON.stringify(d.down)+'\n\nclosest='+JSON.stringify(d.closest)+'\n\nm='+JSON.stringify(d.m)
+	}
+	, mousDn: function () {
+		let q = d.down, m = q.m, e = q.flag = event
+			, c = q.p = d.closest.p;
+		m.x = e.clientX;
+		m.y = e.clientY;
+		q.pc.x = c.x;
+		q.pc.y = c.y;
+		console.log('mousDn:', q, c);
+	}
 
-	Point.prototype.setLvls=function(p){
-			let a=this,b=a&&a.sub,pb=p&&p.sub;
-			while(a&&p){
-				b=a;a=a.nxt;pb=p;p=p.nxt;
-				while(b&&pb){
-					b.set(pb);
-					b=b.sub;pb=pb.sub;
+	, mousUp: function (evt) {
+		d.down.flag = 0;
+		console.log('mousUp:', d.down);
+	}
+	, mousDrg: function (evt) {
+		let q = d.down
+		d.m.x = event.clientX;
+		d.m.y = event.clientY;
+		q.p.set(q.pc.x + (d.m.x - q.m.x), q.pc.y + (d.m.y - q.m.y));
+	}
+
+	, chngCB: function (n) {
+		console.log('chngCB:', d.down);
+		d.drawBzrCrv()
+	}
+	, drawBzrCrv: function () {
+		let p = d.sub, c = d.ctx;
+		c.fillStyle = '#fff';
+		c.clearRect(0, 0, d.dim.w, d.dim.h);
+		c.strokeStyle = c.fillStyle = '#000';
+		if (d.dom.lines.checked) {
+			p.lineLvls();
+			if (d.dom.ctrl.checked) p.drawLvls();
+		} else if (d.dom.ctrl.checked) p.drawLvl();
+		if (d.dom.anim.checked) {
+			d.t += d.dt;
+			if (d.t > 1) d.t = 0;
+			p.tLvls()
+		}
+		if (d.dom.curv.checked) {
+			c.strokeStyle = '#f00';
+			p.curv(d.dom.anim.checked ? d.t : 1);
+		}
+	}
+	, f: (a, b) => a + d.t * (b - a)
+	, buildTree: function (N) {
+		let a = d.cntrlPnts = [];
+		a.length = N < 3 ? 3 : N;
+		d.n = --N;
+		d.serialNo = 0;
+		let p = d.sub = a[0] = new Point(0, 0, d);
+		while (p.i < N) {
+			p.nxt = a[p.i + 1] = new Point(0, p.i + 1, d)
+			p = p.nxt;
+		}
+		let cousin = (p, lvl) => {
+			while (p && p.parent && !p.nxt)
+				p = p.parent;
+			if (p && p.nxt) {
+				p = p.nxt;
+				while (p && p.lvl < lvl)
+					p = p.sub;
+				return p;
+			}
+		}
+			, q = p = d.sub.sub
+		while (p) {
+			q = p;
+			while (q) {
+				if (!q.nxt)
+					q.nxt = cousin(q, q.lvl);
+				q = q.nxt;
+			}
+			p = p.sub;
+		}
+		return d.sub;
+	}
+	, initPoint: z => {
+		window.Point = function Point(lvl, i, parent) {
+			let t = this, m = d.m;
+			t.serialNo = d.serialNo++;
+			t.x = m.x;
+			t.y = m.y;
+			t.lvl = lvl;
+			t.i = i;
+			t.parent = parent;
+			if (i + lvl < d.n)
+				t.sub = new Point(lvl + 1, i, t);
+		}
+
+		Point.prototype.dist = function (p) {
+			if (!p) p = d.m;
+			let t = this, dx = t.x - p.x, dy = t.y - p.y;
+			return Math.sqrt(dx * dx + dy * dy);
+		}
+
+		Point.prototype.toString = function () {
+			let t = this;
+			return JSON.stringify(t, (k, v) => v instanceof Point ? v.serialNo : v)
+		}
+		Point.prototype.update = function () {
+			var t = this, p = t.parent, q = p && p.nxt;
+			if (q) {
+				t.x = d.f(p.x, q.x);
+				t.y = d.f(p.y, q.y);
+			}
+		}
+		Point.prototype.set = function (x, y) {
+			let t = this;
+			if (x.clientX != undefined) {
+				t.x = x.clientX;
+				t.y = x.clientY;
+			} else if (x.x != undefined) {
+				t.x = x.x;
+				t.y = x.y;
+			} else {
+				t.x = x;
+				t.y = y;
+			}
+		}
+		Point.prototype.draw = function () {
+			let t = this, c = d.ctx;
+			c.beginPath();
+			c.arc(t.x, t.y, d.closest.p == t ? 5 : 2, 0, 2 * Math.PI);
+			c.stroke();
+		}
+		Point.prototype.line = function () {
+			let t = this, a = t.parent, b = a.nxt, c = d.ctx;
+			if (!a || !b) return;
+			c.beginPath();
+			c.moveTo(a.x, a.y)
+			c.lineTo(b.x, b.y);
+			c.stroke();
+		}
+		Point.prototype.lineLvls = function () {
+			let a = this, b, c = d.ctx;
+			c.beginPath();
+			while (a) {
+				c.moveTo(a.x, a.y);
+				b = a.nxt;
+				while (b) {
+					c.lineTo(b.x, b.y);
+					b = b.nxt
+				}
+				a = a.sub;
+			}
+			c.stroke();
+		}
+		Point.prototype.drawLvls = function () {
+			let a = this, b, c = d.ctx;
+			c.beginPath();
+			while (a) {
+				b = a;
+				a = a.sub;
+				while (b) {
+					c.beginPath()
+					c.arc(b.x, b.y, d.closest.p == b ? 5 : 2, 0, 2 * Math.PI);
+					b = b.nxt
+				}
+			}
+			c.stroke();
+		}
+		Point.prototype.drawLvl = function () {
+			let b = this, c = d.ctx;
+			while (b) {
+				c.beginPath();
+				c.arc(b.x, b.y, d.closest.p == b ? 5 : 2, 0, 2 * Math.PI);
+				c.stroke();
+				b = b.nxt
+			}
+		}
+		Point.prototype.curv = function (pt) {
+			function memSv(a, b) {
+				while (a) {
+					b = a;
+					a = a.sub;
+					while (b) {
+						if (!b.mem) b.mem = {}
+						b.mem.x = b.x;
+						b.mem.y = b.y;
+						b = b.nxt;
+					}
+				}
+			}
+
+			function memRc(a, b) {
+				while (a) {
+					b = a;
+					a = a.sub;
+					while (b) {
+						if (b.mem) {
+							b.x = b.mem.x;
+							b.y = b.mem.y;
+						}
+						b = b.nxt;
+					}
+				}
+			}
+
+			let ot = d.t, a = this, b = this.sub, p = b, c = d.ctx;
+			d.t = 0;
+			while (p.sub) p = p.sub;
+			memSv(a)
+			c.beginPath();
+			c.moveTo(a.x, a.y);
+			while (d.t <= pt) {
+				b.tLvls();
+				c.lineTo(p.x, p.y);
+				d.t += d.dt;
+			}
+			c.stroke();
+			d.t = ot;
+			memRc(a);
+			b.tLvls();
+		}
+		Point.prototype.tLvls = function () {
+			let a = this, b;
+			while (a) {
+				b = a;
+				a = a.sub;
+				while (b) {
+					b.update()
+					b = b.nxt;
 				}
 			}
 		}
-		*/
-        }//chngN
-        , mousMv: function (evt) {
-            d.m.x = event.clientX;
-            d.m.y = event.clientY;
-            d.closest.find();
-            if (d.down.flag)
-                d.mousDrg();
-            //did('info').innerText='down='+JSON.stringify(d.down)+'\n\nclosest='+JSON.stringify(d.closest)+'\n\nm='+JSON.stringify(d.m)
-        }
-        , mousDn: function () {
-            let q = d.down, m = q.m, e = q.flag = event
-                , c = q.p = d.closest.p;
-            m.x = e.clientX;
-            m.y = e.clientY;
-            q.pc.x = c.x;
-            q.pc.y = c.y;
-            console.log('mousDn:', q, c);
-        }
-
-        , mousUp: function (evt) {
-            d.down.flag = 0;
-            console.log('mousUp:', d.down);
-        }
-        , mousDrg: function (evt) {
-            let q = d.down
-            d.m.x = event.clientX;
-            d.m.y = event.clientY;
-            q.p.set(q.pc.x + (d.m.x - q.m.x), q.pc.y + (d.m.y - q.m.y));
-        }
-
-        , chngCB: function (n) {
-            console.log('chngCB:', d.down);
-            d.drawBzrCrv()
-        }
-        , drawBzrCrv: function () {
-            let p = d.sub, c = d.ctx;
-            c.fillStyle = '#fff';
-            c.clearRect(0, 0, d.dim.w, d.dim.h);
-            c.strokeStyle = c.fillStyle = '#000';
-            if (d.dom.lines.checked) {
-                p.lineLvls();
-                if (d.dom.ctrl.checked) p.drawLvls();
-            } else if (d.dom.ctrl.checked) p.drawLvl();
-            if (d.dom.anim.checked) {
-                d.t += d.dt;
-                if (d.t > 1) d.t = 0;
-                p.tLvls()/*while(p){
-q=p;while(q){
-	q.update();
-	q=q.nxt;}
-p=p.sub;
-}*/
-            }
-            if (d.dom.curv.checked) {
-                c.strokeStyle = '#f00';
-                p.curv(d.dom.anim.checked ? d.t : 1);
-            }
-        }
-        , f: (a, b) => a + d.t * (b - a)
-        , buildTree: function (N) {
-            let a = d.cntrlPnts = [];
-            a.length = N < 3 ? 3 : N;
-            d.n = --N;
-            d.serialNo = 0;
-            let p = d.sub = a[0] = new Point(0, 0, d);
-            while (p.i < N) {
-                p.nxt = a[p.i + 1] = new Point(0, p.i + 1, d)
-                p = p.nxt;
-            }
-            let cousin = (p, lvl) => {
-                while (p && p.parent && !p.nxt)
-                    p = p.parent;
-                if (p && p.nxt) {
-                    p = p.nxt;
-                    while (p && p.lvl < lvl)
-                        p = p.sub;
-                    return p;
-                }
-            }
-                , q = p = d.sub.sub
-            while (p) {
-                q = p;
-                while (q) {
-                    if (!q.nxt)
-                        q.nxt = cousin(q, q.lvl);
-                    q = q.nxt;
-                }
-                p = p.sub;
-            }
-            return d.sub;
-        }
-        , initPoint: z => {
-            window.Point = function Point(lvl, i, parent) {
-                let t = this, m = d.m;
-                t.serialNo = d.serialNo++;
-                t.x = m.x;
-                t.y = m.y;
-                t.lvl = lvl;
-                t.i = i;
-                t.parent = parent;
-                if (i + lvl < d.n)
-                    t.sub = new Point(lvl + 1, i, t);
-            }
-            /*
-	* lvl =0 : i=0 ; i=<>	; i=n-1
-	* lvl =1 : i=0 ; 		; i=n-lvl
-	* lvl =n
-	*
-	* example:N=3 ,n=2(base0)
-	* lvl=0 : i=0 ; i=1 ; i=2
-	* lvl=1 : i=0 ; i=1
-	* lvl=2 : i=0 n-lvl
-	*
-	Point.prototype.initSub=function (nxtPnt){
-		let t=this,q=nxtPnt;
-		t.nxt=q||(q=new Point(t.lvl,t.i+1,t.parent));
-		if(t.lvl<n-1)
-			t.cntrlPnts=new Point(t.lvl+1,0,t). initSub();}
-
-	Point.prototype.seekNxt=function(){
-		let t=this,p=t.parent,n=d.cntrlPnts.length;
-		if(p){
-
+	}//d.initPoint
+	, init: window.onload = z => {
+		d.initPoint()
+		Object.keys(d.dom).forEach(i => d.dom[i] = did(i))
+		p = d.dom.canvs;
+		q = d.dim = {
+			w: p.width = document.body.clientWidth
+			, h: p.height = document.body.clientHeight
+		} // -50
+		q.r = q.h / (d.n + 1)
+		q.cx = q.w / 2;
+		q.cy = q.h / 2;
+		q.ang = Math.PI * 2 / (d.n + 2)
+		d.ctx = p.getContext('2d')
+		p = d.buildTree(3);
+		while (p) {
+			p.x = q.r * Math.cos(p.i * q.ang) + q.cx;
+			p.y = q.r * Math.sin(p.i * q.ang) + q.cy;
+			p = p.nxt;
 		}
-	}
+		d.intvl = setInterval(d.drawBzrCrv, 75);
+	}//d.init
+}//d
 
-*/
-            Point.prototype.dist = function (p) {
-                if (!p) p = d.m;
-                let t = this, dx = t.x - p.x, dy = t.y - p.y;
-                return Math.sqrt(dx * dx + dy * dy);
-            }
+	did=id=> document.getElementById(id);
 
-            Point.prototype.toString = function () {
-                let t = this;
-                return JSON.stringify(t, (k, v) => v instanceof Point ? v.serialNo : v)
-            }
-            Point.prototype.update = function () {
-                var t = this, p = t.parent, q = p && p.nxt;
-                if (q) {
-                    t.x = d.f(p.x, q.x);
-                    t.y = d.f(p.y, q.y);
-                }
-            }
-            Point.prototype.set = function (x, y) {
-                let t = this;
-                if (x.clientX != undefined) {
-                    t.x = x.clientX;
-                    t.y = x.clientY;
-                } else if (x.x != undefined) {
-                    t.x = x.x;
-                    t.y = x.y;
-                } else {
-                    t.x = x;
-                    t.y = y;
-                }
-            }
-            Point.prototype.draw = function () {
-                let t = this, c = d.ctx;
-                c.beginPath();
-                c.arc(t.x, t.y, d.closest.p == t ? 5 : 2, 0, 2 * Math.PI);
-                c.stroke();
-            }
-            Point.prototype.line = function () {
-                let t = this, a = t.parent, b = a.nxt, c = d.ctx;
-                if (!a || !b) return;
-                c.beginPath();
-                c.moveTo(a.x, a.y)
-                c.lineTo(b.x, b.y);
-                c.stroke();
-            }
-            Point.prototype.lineLvls = function () {
-                let a = this, b, c = d.ctx;
-                c.beginPath();
-                while (a) {
-                    c.moveTo(a.x, a.y);
-                    b = a.nxt;
-                    while (b) {
-                        c.lineTo(b.x, b.y);
-                        b = b.nxt
-                    }
-                    a = a.sub;
-                }
-                c.stroke();
-            }
-            Point.prototype.drawLvls = function () {
-                let a = this, b, c = d.ctx;
-                c.beginPath();
-                while (a) {
-                    b = a;
-                    a = a.sub;
-                    while (b) {
-                        c.beginPath()
-                        c.arc(b.x, b.y, d.closest.p == b ? 5 : 2, 0, 2 * Math.PI);
-                        b = b.nxt
-                    }
-                }
-                c.stroke();
-            }
-            Point.prototype.drawLvl = function () {
-                let b = this, c = d.ctx;
-                while (b) {
-                    c.beginPath();
-                    c.arc(b.x, b.y, d.closest.p == b ? 5 : 2, 0, 2 * Math.PI);
-                    c.stroke();
-                    b = b.nxt
-                }
-            }
-            Point.prototype.curv = function (pt) {
-                function memSv(a, b) {
-                    while (a) {
-                        b = a;
-                        a = a.sub;
-                        while (b) {
-                            if (!b.mem) b.mem = {}
-                            b.mem.x = b.x;
-                            b.mem.y = b.y;
-                            b = b.nxt;
-                        }
-                    }
-                }
-
-                function memRc(a, b) {
-                    while (a) {
-                        b = a;
-                        a = a.sub;
-                        while (b) {
-                            if (b.mem) {
-                                b.x = b.mem.x;
-                                b.y = b.mem.y;
-                            }
-                            b = b.nxt;
-                        }
-                    }
-                }
-
-                let ot = d.t, a = this, b = this.sub, p = b, c = d.ctx;
-                d.t = 0;
-                while (p.sub) p = p.sub;
-                memSv(a)
-                c.beginPath();
-                c.moveTo(a.x, a.y);
-                while (d.t <= pt) {
-                    b.tLvls();
-                    c.lineTo(p.x, p.y);
-                    d.t += d.dt;
-                }
-                c.stroke();
-                d.t = ot;
-                memRc(a);
-                b.tLvls();
-            }
-            Point.prototype.tLvls = function () {
-                let a = this, b;
-                while (a) {
-                    b = a;
-                    a = a.sub;
-                    while (b) {
-                        b.update()
-                        b = b.nxt;
-                    }
-                }
-            }
-        }//d.initPoint
-        , init: window.onload = z => {
-            d.initPoint()
-            Object.keys(d.dom).forEach(i => d.dom[i] = did(i))
-            p = d.dom.canvs;
-            q = d.dim = {
-                w: p.width = document.body.clientWidth
-                , h: p.height = document.body.clientHeight
-            } // -50
-            q.r = q.h / (d.n + 1)
-            q.cx = q.w / 2;
-            q.cy = q.h / 2;
-            q.ang = Math.PI * 2 / (d.n + 2)
-            d.ctx = p.getContext('2d')
-            p = d.buildTree(3);
-            while (p) {
-                p.x = q.r * Math.cos(p.i * q.ang) + q.cx;
-                p.y = q.r * Math.sin(p.i * q.ang) + q.cy;
-                p = p.nxt;
-            }
-            d.intvl = setInterval(d.drawBzrCrv, 75);
-        }//d.init
-    }//d
-}//amos
-did=id=> document.getElementById(id);
-
-/**
+/**<breakdown stage0>
 amos creator(2d - html5canvas)cell editor
-palete(Context2dPalete:Context2d creates a Construct2D )
-	path(beginPath,stroke,fill)
-		point(prop,isInPath, isInStroke,lineTo,moveTo)
-		arc (at , to)
-		ellipse
-		rect (stroke,fill)
-		curv (beizerTo , quadraticTo )
-	group
-	text(fill|stroke) (font , align , baseline) (measure)
-	fill(each)stroke
-		color / alpha
-		width , lineWidth
-		paint
-		img(url | base64)
-		gradient ( linear | radial )
+	palete(Context2dPalete:Context2d creates a Construct2D )
+		path(beginPath,stroke,fill)
+			point(prop,isInPath, isInStroke,lineTo,moveTo)
+			arc (at , to)
+			ellipse
+			rect (stroke,fill)
+			curv (beizerTo , quadraticTo )
+		group
+		text(fill|stroke) (font , align , baseline) (measure)
+		fill(each)stroke
+			color / alpha
+			width , lineWidth
+			paint
+			img(url | base64)
+			gradient ( linear | radial )
 			create
-		pattern
+			pattern
 			create
-		filter
+			filter
 			shadow Blur,color,offset(x,y)
-	line join,cap,dashoffset(prop,get,set),miterLimit
-	transform(prop,get,reset, rotate, scale,translate,set )
-	state(save,restore)
-	hitRegion(prop,create,remove)
-	imgData ( create ,get,put)
-	template(brush,op)
-	script(JSSyntax)<expr>
+		line join,cap,dashoffset(prop,get,set),miterLimit
+		transform(prop,get,reset, rotate, scale,translate,set )
+		state(save,restore)
+		hitRegion(prop,create,remove)
+		imgData ( create ,get,put)
+		template(brush,op)
+		script(JSSyntax)<expr>
 		<literals>
-			number,string,bool(true false null undefined)
-			obj //<scope|symbolTbl>(as a Construct2d has props: entries,where each entry has: point,key(text,offset),val)
-			array (as a Construct2d(a grid) has props:gridCellOffset CoordSystem_Transform)
-			new
+		number,string,bool(true false null undefined)
+		obj //<scope|symbolTbl>(as a Construct2d has props: entries,where each entry has: point,key(text,offset),val)
+		array (as a Construct2d(a grid) has props:gridCellOffset CoordSystem_Transform)
+		new
 		<operators>
-			<Arithmetic>
-				+ - * / ++ -- **
-			ternirary
-			<memberProp//arrIndex|dotNotation >
-			<logical> && || !
-			<compar>< <= > >= == !=
-			<bitwise> & | ^ !!
-			<assign> =
+		<Arithmetic>
+		+ - * / ++ -- **
+		ternirary
+		<memberProp//arrIndex|dotNotation >
+		<logical> && || !
+		<compar>< <= > >= == !=
+		<bitwise> & | ^ !!
+		<assign> =
 		<decl>
-			funcDecl
-			classDecl
+		funcDecl
+		classDecl
 		<builtin classes>Object , JSSyntax , Context2d , Array , String , Date , Math , Function , JSON , Dom(Window,Document,Element)
 		funcCall
 		<control>if,while,try,throw,return,break,switch,for
-outline
-canvas
+	outline
+	canvas
 	implicit-group (border , action-buttons , transform , op )
 	op(mode: CoordSystem(cart|polar , layoutMan ) , selectionList , palete , outline/symbolTbl )
+*/
 
- ///////////////////////////////////////
 
+/**<breakdown stage1> (action-plan : steps)
+	 <op>
+		 ,implicit-group / borderOps (
+			 CoordSys(cartesian , polar)
+			,transforms (translate, rotate, scale )
+			,anim
+			)
+		dom divs(
+			outline
+			,palete
+			,name-selections
+			,entity-ops(
+				clone
+				,newSubObject
+				,newProp
+				,listProps
+				,renamePropKey
+				,json(stringify,parse)
+			)
+			,props
+		)
+		path
+		group
+*/
+
+ /**<breakdown stage2>
+  Group Op (CompositeConstruct)
+	1. op dom-templates engine(DeclaritiveProgramming)
+		4-divs (outline(tree , entity-ops ) , named-selections , palete , props )
+	2. op implicit-group (borderOps)
+		drawBorder
+		,transforms (translate, rotate, scale )
+		,CoordSys(cartesian , polar) (bools:ShowOffset )
+	3. array grid LayoutOnCanvas
+	4. obj LayoutOnCanvas
+
+  Point Op (AtomicConstruct)
+	1. op dom-templates engine(DeclaritiveProgramming)
+		3-divs (outline(tree , entity-ops ) , named-selections , palete )
+	2. op implicit-group (borderOps)
+		drawBorder
+		,transforms (translate, rotate, scale )
+		,CoordSys(cartesian , polar) (bools:ShowOffset )
+	3. array grid LayoutOnCanvas
+	4. obj LayoutOnCanvas
  */
+
+ /**<breakdown stage3>
+ Construct , 
+	1st-implementation is a point
+	2nd implementation is a group
+	3rd: implementation-add outline and path
+	4th: implementation-add borderOps
+	5th: implementation-add array-grid LayoutOnCanvas
+	6th: implementation-add obj LayoutOnCanvas
+ */
+
+amos= {
+ man: {
+  protoConstruction:{ //declProg
+		init4Divs:function(parentDom,prms){}
+		,initConstructProto:function(construct,prms){}
+		,Construct1stProto:{
+			// inits:
+			init:function(parentCnstrct,fields){
+				//init decl-4divs (in 1stImpl 1divs which is props )
+				
+				
+			}
+
+			//events: onOvr onExit onClck onMv onDrag onChng onFocus onBlur
+			,onOvr:function(evt){}
+			,onExit:function(evt){}
+			,onClck:function(evt){}
+			,onMv:function(evt){}
+			,onDrag:function(evt){}
+			,onChng:function(evt){}
+			,onFocus:function(evt){}
+			,onBlur:function(evt){}
+
+			//fnctns: drawBorder updateDivs boundingbox
+			drawBorder:function(evt){}
+			,updateDivs:function(evt){}
+			,boundingbox:function(evt){}
+		}//Construct1stProto
+	}//protoConstruction
+  ,context:{ctx:0,dom:{canvs:0,opDiv:0,amosDiv:0}}
+  ,dom:{did:id=> document.getElementById(id)
+	,e:(nm,p,id,atrbs,styl,txt)=>{
+		let e=document.createElement(nm);
+		if(id)e.id=id;
+		if(atrbs)Object.keys(atrbs).forEach(k=>e[k]=atrbs[k]);
+		if(styl)Object.keys(styl).forEach(k=>e.style[k]=styl[k]);
+		if(txt)amos.man.dom.txt(txt,e)
+		if(p)p.appendChild(e);return e;}
+	,txt:(txt,p)=>{let e=document.createTextNode(txt);if(p)p.appendChild(e);return e;}
+	,inp:(typ,val,onchng,id,p,atrbs,styl)=>{
+		let e=amos.man.dom.e(['textarea','select','button'].includes(typ)?typ:'input',0,id,atrbs,styl)
+		if(val!=undefined)e.value=val;
+		if(onchng)e.onchange=onchng
+		if(p)p.appendChild(e);return e;}
+	,fldst:(lgnd,c,p,atrbs,styl)=>{
+		let f=amos.man.dom.e('fieldset',0,id,atrbs,styl)
+		,g=amos.man.dom.e('legend',f,0,0,0,lgnd)
+		if(c)e.value=val;
+		if(onchng)e.onchange=onchng
+		if(p)p.appendChild(e);return e;}
+	,bld:()=>{}
+  }//dom
+ }//man
+
+ ,Construct:function(parent,fields) // currently 1st-implementation (Point)
+{//CompositeConstruct 
+
+ }//Construct
+
+} // amos
+
 </script>
-	<script src="amos_interface_manager.js"></script>
-	<script src="amos_interface_op.js"></script>
-	<script src="amos_interface_template.js"></script>
-	<script src="amos_interface_construct.js"></script>
-	<script src="amos_template_point.js"></script>
-	<script src="amos_template_beizer.js"></script>
-	<script src="amos_template_path.js"></script>
-	<script src="amos_visualise_coordSys.js"></script>
-	<script src="amos_visualise_outline.js"></script>
-	<script src="amos_visualise_template.js"></script>
-	<script src="amos_visualise_selection.js"></script>
-	<script src="amos_visualise_scope.js"></script>
 <style>fieldset{display: inline}</style>
 </head>
 <body onresize="d.resz()">
