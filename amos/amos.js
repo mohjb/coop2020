@@ -105,6 +105,7 @@ amos= {
 				,st=d.e('style');
 			st.innerHTML='fieldset{display:inline}';
 			b.appendChild(st)
+			amos.Point.prototype=amos.man.protoConstruction.Construct1stProto;
 			amos.Construct.prototype=amos.man.protoConstruction.Construct1stProto;
 			Object.keys(cd).forEach(k=>cd[k]=k=='canvas'?
 				d.e(k,b,k):
@@ -316,10 +317,24 @@ amos= {
 		}//dom
 	}//man
 	,outline:[]
-	,Construct:function(parent,params){
+	,Point:function(parent,params){
 		// currently 1st-implementation (Point) //CompositeConstruct
 		let t=this,p=params;
 		t.x=p.x;t.y=p.y;t.label=p.label;//label.str,.ox,.oy
+		if(parent&&parent.appendChild)
+			parent.appendChild(t);
+		t.initFields();
+	}//Point	
+	,Construct:function(parent,params){
+		if(!params)params={x:0,y:0,label:{str:'0'}}
+		if(!params.label)params.label={str:'0'}
+		if(!params.label.str)params.label.str='0'
+		let t=this,p=params,a=t.points
+		=[new amos.Point(t,params)
+		 ,new amos.Point(t,params)];
+		a[0].label.str+='.p0'
+		a[1].label.str+='.p1'
+		t.label=p.label;//label.str,.ox,.oy
 		if(parent&&parent.appendChild)
 			parent.appendChild(t);
 		t.initFields();
