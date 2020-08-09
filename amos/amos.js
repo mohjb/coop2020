@@ -65,20 +65,35 @@ amos= {
 				}
 				,boundingbox:function(evt){
 					let t=this;return{x:t.x-t.r,y:t.y-t.r,w:t.r*2,h:t.r*2};}
-				,isOvr:function(p){
-					let t=this;return t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
+				,getOvr:function(p){
+					let t=this;if(t.points)
+					{	let a=t.points,o=a.find(e=>e.getOvr(p));
+						return o?o:a[0].x<=p.x&&p.x<=a[1].x
+						&& a[0].y<=p.y&&p.y<=a[1].y ?t:0;}
+					return t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
+						&& t.y<=p.y+t.r*2 && p.y<=(t.y+t.r)?t:0;}
+				,isOvr:function(p){let t=this;
+					return t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
 						&& t.y<=p.y+t.r*2 && p.y<=(t.y+t.r);}
-				,onDraw:function(evt,ctx){this.drawBorder(evt,ctx);}
+				,onDraw:function(evt,ctx){let t=this,a=t.points;
+					if(a)a.forEach(p=>p.onDraw(evt,ctx));
+					else t.drawBorder(evt,ctx);}
 				,distance:function(p){
-					let t=this
-						,q=p||amos.man.context.events.m
+					let t=this,a=t.points,d
+						,z=Number.MAX_VALUE
+					if(a)
+						return a.reduce((accum,current)=>
+							(d=current.distance(p))<z
+							?z=d
+							:z
+						,z)
+					let q=p||amos.man.context.events.m
 						,dx=t.x-q.x,dy=t.y-q.y,r=dx*dx+dy*dy
 						,v=Math.sqrt(r);return v;}
 				,toString:function(){let t=this,b=['{x:',t.x,',y:',t.y];
 					if(t.label)b.push(',label:',t.label);
 					b.push('}');
-					return b.join('');
-				}
+					return b.join('');}
 				,appendChild:function(c){
 					let t=c.parent=this;
 					c.prv=t.lastChild;
@@ -324,7 +339,7 @@ amos= {
 		if(parent&&parent.appendChild)
 			parent.appendChild(t);
 		t.initFields();
-	}//Point	
+	}//Point
 	,Construct:function(parent,params){
 		if(!params)params={x:0,y:0,label:{str:'0'}}
 		if(!params.label)params.label={str:'0'}
