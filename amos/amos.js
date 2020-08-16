@@ -66,14 +66,15 @@ amos= {
 				,boundingbox:function(evt){
 					let t=this;return{x:t.x-t.r,y:t.y-t.r,w:t.r*2,h:t.r*2};}
 				,getOvr:function(p){
-					let t=this;if(t.points)
-					{	let a=t.points,o=a.find(e=>e.getOvr(p));
+					let t=this,a=t.points;if(a)
+					{	let o=a.find(e=>e.getOvr(p));
 						return o?o:a[0].x<=p.x&&p.x<=a[1].x
 						&& a[0].y<=p.y&&p.y<=a[1].y ?t:0;}
 					return t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
 						&& t.y<=p.y+t.r*2 && p.y<=(t.y+t.r)?t:0;}
 				,isOvr:function(p){let t=this;
-					return t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
+					return t.points?t.getOvr(p):
+						t.x<=p.x+t.r*2&&p.x<=(t.x+t.r)
 						&& t.y<=p.y+t.r*2 && p.y<=(t.y+t.r);}
 				,onDraw:function(evt,ctx){let t=this,a=t.points;
 					if(a)a.forEach(p=>p.onDraw(evt,ctx));
@@ -90,8 +91,10 @@ amos= {
 					let q=p||amos.man.context.events.m
 						,dx=t.x-q.x,dy=t.y-q.y,r=dx*dx+dy*dy
 						,v=Math.sqrt(r);return v;}
-				,toString:function(){let t=this,b=['{x:',t.x,',y:',t.y];
-					if(t.label)b.push(',label:',t.label);
+				,toString:function(){let t=this,a=t.points,b=['{'];
+					if(a){b.push('points:[');a.forEach((p,i)=>b.push(i?','+p:p));b.push(']');}
+					else b.push('x:',t.x,',y:',t.y);
+					if(t.label)b.push(',label:',JSON.stringify(t.label));
 					b.push('}');
 					return b.join('');}
 				,appendChild:function(c){
@@ -117,9 +120,8 @@ amos= {
 				,cnvs,info={}
 				,cd=c.dom
 				,d=am.dom
-				,st=d.e('style');
+				,st=d.e('style',b);
 			st.innerHTML='fieldset{display:inline}';
-			b.appendChild(st)
 			amos.Point.prototype=amos.man.protoConstruction.Construct1stProto;
 			amos.Construct.prototype=amos.man.protoConstruction.Construct1stProto;
 			Object.keys(cd).forEach(k=>cd[k]=k=='canvas'?
@@ -136,6 +138,14 @@ amos= {
 			cnvs.onmousedown=c.events.onMousDn;
 			c.events.onResz();
 			c.events.onDraw(c.ctx); //c.events.intrvl=setInterval(c.events.onDraw,100)
+			am.log=(s,o)=>amos.man.log.span.innerHTML=s+am.log.j1(o);
+			am.log.j1=o=>{let a=Object.keys(o)
+				,b=a.map((k,i)=>
+					(i?','+k:k)+'='+o[k]
+				)
+				,c=b.join('');
+				return c;}
+			am.log.fs=d.fldst('msMv',am.log.span=d.e('span'),b)
 		}//initPage
 		,context:{ctx:0,dom:{canvas:0,opDiv:0,amosDiv:0}
 			,events:{m:{x:0,y:0}
@@ -145,14 +155,14 @@ amos= {
 					// flag::= bool if mouse-button is currently down
 					,flag:0}
 				,closest:{p:0,dist:0
-					,find:function(){
+					,find:z=>amos.outline.find(p=>p&&p.getOvr&&p.getOvr(amos.man.context.events.m))/*function(){
 						let t=amos.man.context.events,c=t.closest,o=c.p //,oz=c.dist;
 						c.dist=Number.MAX_VALUE;
 						amos.outline.forEach(p=>{
 							let z=p.distance(t.m);if(z<c.dist){
 								c.dist=z;c.p=p;
 							}});//if(o!=c.p)console.log('closest=',c.p,',old=',o);
-						return c.p;}
+						return c.p;}*/
 				} //closest
 				,onResz:function(evt){
 					let b=document.body
@@ -173,23 +183,23 @@ amos= {
 					amos.outline.forEach(c=>c.onDraw(evt,ctx))
 				}
 				,onMousMv:function(evt){
-					let t=amos.man.context.events;
+					let am=amos.man,t=am.context.events;
 					if(!evt)evt=event;
 					t.m.x=evt.x //clientX;
 					t.m.y=evt.offsetY // y // clientY;
 					if(t.down.flag ) {
-						//let m=t.m;//,b=t.down.p.boundingbox();
+						am.log('drag:',t.m)//let m=t.m;//,b=t.down.p.boundingbox();
 						t.onDrag(evt)
 					}else//if(!t.down.flag)
-					{
-						let c=t.closest,z=c.o
-						c.find();
+					{let c=t.closest,z=c.o
+						c.p=c.find();
+						am.log('mv:'+c.p+';',t.m)
 						if(c.p!=z) {
 							//console.log('closest:', c.p)
 							if(z)
 								z.onExit(evt)
 							c.o=0;
-							if(c.p.isOvr(t.m))
+							if(c.p&&c.p.isOvr&&c.p.isOvr(t.m))
 								(c.o=c.p).onOvr(evt);
 							t.onDraw(evt)
 						}else if(c.o )
@@ -335,16 +345,22 @@ amos= {
 	,Point:function(parent,params){
 		// currently 1st-implementation (Point) //CompositeConstruct
 		let t=this,p=params;
-		t.x=p.x;t.y=p.y;t.label=p.label;//label.str,.ox,.oy
+		t.x=p.x;t.y=p.y;t.label=JSON.
+			parse(JSON.stringify(p.label));//label.str,.ox,.oy
 		if(parent&&parent.appendChild)
 			parent.appendChild(t);
 		t.initFields();
 	}//Point
 	,Construct:function(parent,params){
 		if(!params)params={x:0,y:0,label:{str:'0'}}
-		if(!params.label)params.label={str:'0'}
-		if(!params.label.str)params.label.str='0'
-		let t=this,p=params,a=t.points
+		let t=this,p=params,l=params.label,ol=l;
+		if(!l)params.label=l=ol={str:'0'}
+		else
+		{	if(!l.str)l.str='0';
+			params.label=l=JSON.
+			parse(JSON.stringify(l))
+		}
+		let a=t.points
 		=[new amos.Point(t,params)
 		 ,new amos.Point(t,params)];
 		a[0].label.str+='.p0'
@@ -353,6 +369,7 @@ amos= {
 		if(parent&&parent.appendChild)
 			parent.appendChild(t);
 		t.initFields();
+		if(ol!=l&&ol)params.label=ol
 	}//Construct
 /**<breakdown stage0>
 amos creator(2d - html5canvas)cell editor
